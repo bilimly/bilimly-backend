@@ -30,15 +30,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── ROUTES ─────────────────────────────────────────────────
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/tutors', require('./routes/tutors'));
-app.use('/api/bookings', require('./routes/bookings'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/packages', require('./routes/packages'));
-app.use('/api/earnings', require('./routes/earnings'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/support', require('./routes/support'));
-app.use('/api/admin', require('./routes/admin'));
+app.use('/api/auth', require('./src/routes/auth'));
+app.use('/api/tutors', require('./src/routes/tutors'));
+app.use('/api/bookings', require('./src/routes/bookings'));
+app.use('/api/payments', require('./src/routes/payments'));
+app.use('/api/packages', require('./src/routes/packages'));
+app.use('/api/earnings', require('./src/routes/earnings'));
+app.use('/api/messages', require('./src/routes/messages'));
+app.use('/api/support', require('./src/routes/support'));
+app.use('/api/admin', require('./src/routes/admin'));
 
 // ── HEALTH CHECK ───────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -73,8 +73,8 @@ app.listen(PORT, () => {
   `);
 
   // Start background jobs
-  const { startReminderJob } = require('./utils/reminderJob');
-  const { scheduleRoomCreation } = require('./services/videoService');
+  const { startReminderJob } = require('./src/utils/reminderJob');
+  const { scheduleRoomCreation } = require('./src/services/videoService');
   startReminderJob();
   scheduleRoomCreation();
 });
