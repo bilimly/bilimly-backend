@@ -20,5 +20,5 @@ app.use('/api/support', require('./src/routes/support'));
 app.use('/api/admin', require('./src/routes/admin'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 app.use((err, req, res, next) => res.status(500).json({ error: 'Server error' }));
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => console.log('BILIMLY RUNNING on port ' + PORT));
