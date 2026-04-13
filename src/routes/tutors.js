@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
       pages: Math.ceil(countResult.rows[0].count / limit)
     });
   } catch (err) {
-    console.error('Tutors error:', err.message);
+    cconsole.error('Tutors error FULL:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to fetch tutors' });
   }
 });
