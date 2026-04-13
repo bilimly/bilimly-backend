@@ -4,6 +4,7 @@ const { auth, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
+  console.log('TUTORS HIT, NODE_ENV:', process.env.NODE_ENV);
   try {
     const result = await pool.query(
       `SELECT u.id, u.first_name, u.last_name, u.avatar_url,
