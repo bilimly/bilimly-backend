@@ -16,6 +16,7 @@ app.use('/api/payments', require('./src/routes/payments'));
 app.use('/api/packages', require('./src/routes/packages'));
 app.use('/api/earnings', require('./src/routes/earnings'));
 app.use('/api/messages', require('./src/routes/messages'));
+app.use('/api/subjects', require('./src/routes/subjects'));
 app.use('/api/support', require('./src/routes/support'));
 app.use('/api/admin', require('./src/routes/admin'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
