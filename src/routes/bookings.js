@@ -217,3 +217,48 @@ router.post('/:id/complete', auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── LESSON SUMMARY ─────────────────────────────────────────
+router.post('/:id/summary', auth, requireRole('tutor'), async (req, res) => {
+  const { summary, homework, progress_rating } = req.body;
+  try {
+    await pool.query(
+      `UPDATE bookings SET 
+        lesson_summary=$1, homework=$2, progress_rating=$3, 
+        summary_sent_at=NOW(), updated_at=NOW()
+       WHERE id=$4`,
+      [summary, homework, progress_rating, req.params.id]
+    );
+
+    const booking = await pool.query(
+      `SELECT b.*, 
+              s.email as student_email, s.first_name as student_first,
+              t.first_name as tutor_first, t.last_name as tutor_last
+       FROM bookings b
+       JOIN users s ON b.student_id = s.id
+       JOIN users t ON b.tutor_id = t.id
+       WHERE b.id=$1`,
+      [req.params.id]
+    );
+
+    if (booking.rows[0]) {
+      const b = booking.rows[0];
+      const { sendLessonSummary } = require('../services/emailService');
+      sendLessonSummary(
+        b.student_email,
+        b.student_first,
+        b.student_first,
+        b.tutor_first + ' ' + b.tutor_last,
+        b.subject,
+        summary,
+        homework,
+        new Date(b.lesson_date).toLocaleDateString('ru-RU')
+      ).catch(console.error);
+    }
+
+    res.json({ message: 'Summary saved and sent!' });
+  } catch(err) {
+    console.error('Summary error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
