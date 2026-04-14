@@ -19,7 +19,6 @@ app.use('/api/earnings', require('./src/routes/earnings'));
 app.use('/api/messages', require('./src/routes/messages'));
 const passport = require('passport');
 app.use(passport.initialize());
-app.use('/api/auth/google', require('./src/routes/googleAuth'));
 app.use('/api/subjects', require('./src/routes/subjects'));
 app.use('/api/support', require('./src/routes/support'));
 app.use('/api/admin', require('./src/routes/admin'));
