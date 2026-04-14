@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../config/database');
+const { sendBookingConfirmation } = require('../services/emailService');
 const { auth, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
@@ -55,7 +56,22 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
       'UPDATE payments SET mbank_qr_code=$1, mbank_qr_url=$2 WHERE id=$3',
       [qrData.qr_code, qrData.qr_url, payment.rows[0].id]
     );
-
+// Send confirmation email
+try {
+  const student = await pool.query('SELECT email, first_name, last_name FROM users WHERE id=$1', [req.user.id]);
+  const tutor = await pool.query('SELECT u.email, u.first_name, u.last_name FROM users u JOIN tutor_profiles tp ON u.id=tp.user_id WHERE tp.id=$1', [tutor_id]);
+  if (student.rows[0] && tutor.rows[0]) {
+    sendBookingConfirmation(
+      student.rows[0].email,
+      student.rows[0].first_name,
+      tutor.rows[0].first_name + ' ' + tutor.rows[0].last_name,
+      subject || 'Урок',
+      lesson_date,
+      start_time,
+      amount
+    );
+  }
+} catch(e) {}
     res.status(201).json({
       booking: booking.rows[0],
       payment: {

@@ -28,6 +28,8 @@ router.post('/register', [
     const user = result.rows[0];
     if (role === 'tutor') await pool.query('INSERT INTO tutor_profiles (user_id) VALUES ($1)', [user.id]);
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const { sendWelcomeEmail } = require('../services/emailService');
+sendWelcomeEmail(email, first_name, role).catch(console.error);
     res.status(201).json({ token, user });
   } catch (err) {
     console.error('Register error:', err);
