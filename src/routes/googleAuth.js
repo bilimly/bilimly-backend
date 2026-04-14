@@ -45,16 +45,16 @@ router.get('/', (req, res) => {
 
 router.get('/callback', (req, res, next) => {
   const passport = require('passport');
-  passport.authenticate('google', { session: false, failureRedirect: 'https://bilimly.kg?error=auth' },
+  passport.authenticate('google', { session: false, failureRedirect: 'https://www.bilimly.kg?error=auth' },
     (err, user) => {
-      if (err || !user) return res.redirect('https://bilimly.kg?error=auth');
+      if (err || !user) return res.redirect('https://www.bilimly.kg?error=auth');
       const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
       const userData = encodeURIComponent(JSON.stringify({
         id: user.id, email: user.email,
         first_name: user.first_name, last_name: user.last_name,
         role: user.role, avatar_url: user.avatar_url
       }));
-      res.redirect(`https://bilimly.kg?token=${token}&user=${userData}`);
+      res.redirect(`https://www.bilimly.kg?token=${token}&user=${userData}`);
     }
   )(req, res, next);
 });
