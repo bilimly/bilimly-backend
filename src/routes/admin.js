@@ -264,3 +264,23 @@ router.put('/bookings/:id/cancel', async (req, res) => {
     res.json({ message: 'Cancelled' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+router.get('/applications/full', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        u.id as user_id, u.first_name, u.last_name, u.email, u.created_at,
+        tp.id as profile_id, tp.bio_ru, tp.bio_en, tp.subjects, 
+        tp.hourly_rate, tp.trial_rate, tp.video_intro_url,
+        tp.is_approved, tp.approval_status, tp.city,
+        (SELECT COUNT(*) FROM bookings WHERE tutor_id = u.id) as total_lessons
+      FROM users u
+      JOIN tutor_profiles tp ON u.id = tp.user_id
+      WHERE u.role = 'tutor' AND tp.approval_status != 'approved'
+      ORDER BY u.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
