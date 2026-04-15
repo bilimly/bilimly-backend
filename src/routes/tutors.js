@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
               tp.id as tutor_id, tp.bio_ru, tp.bio_en, tp.bio_ky,
               tp.hourly_rate, tp.trial_rate, tp.subjects,
               tp.rating, tp.review_count, tp.total_lessons,
-              tp.is_featured, tp.video_intro_url, tp.city
+              tp.is_featured, tp.video_intro_url, tp.city, tp.badge, tp.total_students, tp.response_rate, tp.repeat_student_rate
        FROM users u
        JOIN tutor_profiles tp ON u.id = tp.user_id
        WHERE tp.is_approved = true AND u.is_active = true
