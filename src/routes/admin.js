@@ -222,3 +222,45 @@ router.get('/messages', async (req, res) => {
 });
 
 module.exports = router;
+
+router.put('/tutors/:userId/approve', async (req, res) => {
+  try {
+    await pool.query(`UPDATE tutor_profiles SET is_approved=true, approval_status='approved' WHERE user_id=$1`, [req.params.userId]);
+    res.json({ message: 'Tutor approved' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/users/:userId/toggle-active', async (req, res) => {
+  try {
+    await pool.query(`UPDATE users SET is_active = NOT is_active WHERE id=$1`, [req.params.userId]);
+    res.json({ message: 'Done' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/applications/:id/approve', async (req, res) => {
+  try {
+    await pool.query(`UPDATE tutor_applications SET status='approved' WHERE id=$1`, [req.params.id]);
+    res.json({ message: 'Approved' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/applications/:id/reject', async (req, res) => {
+  try {
+    await pool.query(`UPDATE tutor_applications SET status='rejected' WHERE id=$1`, [req.params.id]);
+    res.json({ message: 'Rejected' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/bookings/:id/confirm', async (req, res) => {
+  try {
+    await pool.query(`UPDATE bookings SET status='confirmed' WHERE id=$1`, [req.params.id]);
+    res.json({ message: 'Confirmed' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/bookings/:id/cancel', async (req, res) => {
+  try {
+    await pool.query(`UPDATE bookings SET status='cancelled' WHERE id=$1`, [req.params.id]);
+    res.json({ message: 'Cancelled' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
