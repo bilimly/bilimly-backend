@@ -284,3 +284,13 @@ router.get('/applications/full', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+router.put('/tutors/:userId/reject', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE tutor_profiles SET is_approved=false, approval_status='rejected', approval_notes=$1 WHERE user_id=$2`,
+      [req.body.reason || 'Не соответствует требованиям', req.params.userId]
+    );
+    res.json({ message: 'Tutor rejected' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
