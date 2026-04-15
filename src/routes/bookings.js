@@ -262,3 +262,28 @@ router.post('/:id/summary', auth, requireRole('tutor'), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── REVIEW AFTER LESSON ────────────────────────────────────
+router.post('/:id/review', auth, async (req, res) => {
+  const { tutor_id, rating, comment } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO reviews (tutor_id, student_id, booking_id, rating, comment, is_published)
+       VALUES ($1,$2,$3,$4,$5,true)
+       ON CONFLICT (booking_id) DO UPDATE SET rating=$4, comment=$5`,
+      [tutor_id, req.user.id, req.params.id, rating, comment]
+    );
+    await pool.query(
+      `UPDATE tutor_profiles SET
+        rating = (SELECT AVG(rating) FROM reviews WHERE tutor_id=$1 AND is_published=true),
+        review_count = (SELECT COUNT(*) FROM reviews WHERE tutor_id=$1 AND is_published=true)
+       WHERE user_id=$1`,
+      [tutor_id]
+    );
+    await pool.query('UPDATE bookings SET reviewed=true WHERE id=$1',[req.params.id]);
+    res.json({ message: 'Review submitted!' });
+  } catch(err) {
+    console.error('Review error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
