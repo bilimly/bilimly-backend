@@ -101,3 +101,23 @@ router.post('/apply', async (req, res) => {
 });
 
 module.exports = router;
+
+router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE tutor_profiles SET approval_status='pending', updated_at=NOW() WHERE user_id=$1`,
+      [req.user.id]
+    );
+    const tutor = await pool.query(
+      'SELECT u.email, u.first_name FROM users u WHERE u.id=$1',
+      [req.user.id]
+    );
+    if (tutor.rows[0]) {
+      const { sendWelcomeEmail } = require('../services/emailService');
+      sendWelcomeEmail('admin@bilimly.kg', tutor.rows[0].first_name + ' submitted for review', 'tutor').catch(console.error);
+    }
+    res.json({ message: 'Submitted for review' });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
