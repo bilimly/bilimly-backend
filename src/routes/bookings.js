@@ -354,3 +354,45 @@ router.post('/recurring', auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── LESSON PACKAGES V2 ─────────────────────────────────────
+router.post('/packages/buy', auth, async (req, res) => {
+  const { tutor_id, subject, lessons } = req.body;
+  try {
+    const tutorRate = await pool.query(
+      'SELECT hourly_rate FROM tutor_profiles WHERE user_id=$1',
+      [tutor_id]
+    );
+    const rate = parseFloat(tutorRate.rows[0]?.hourly_rate || 500);
+    
+    const discounts = { 5: 5, 10: 8, 20: 11 };
+    const discount = discounts[lessons] || 0;
+    const pricePerLesson = rate * (1 - discount/100);
+    const totalAmount = pricePerLesson * lessons;
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + Math.ceil(lessons/8));
+
+    const result = await pool.query(
+      `INSERT INTO lesson_packages 
+        (student_id, tutor_id, subject, total_lessons, price_per_lesson, 
+         total_amount, discount_percent, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [req.user.id, tutor_id, subject, lessons, 
+       pricePerLesson, totalAmount, discount, expiresAt]
+    );
+
+    res.status(201).json({
+      package: result.rows[0],
+      summary: {
+        lessons,
+        discount: discount+'%',
+        price_per_lesson: Math.round(pricePerLesson),
+        total: Math.round(totalAmount),
+        savings: Math.round(rate * lessons - totalAmount)
+      }
+    });
+  } catch(err) {
+    console.error('Package error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
