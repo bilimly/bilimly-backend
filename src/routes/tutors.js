@@ -32,7 +32,7 @@ router.get('/:id', async (req, res) => {
               tp.*
        FROM users u
        JOIN tutor_profiles tp ON u.id = tp.user_id
-       WHERE (u.id = $1 OR tp.id = $1) AND tp.is_approved = true`,
+       WHERE (u.id = $1 OR tp.id = $1)`,
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
