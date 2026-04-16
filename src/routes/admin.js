@@ -226,6 +226,44 @@ module.exports = router;
 router.put('/tutors/:userId/approve', async (req, res) => {
   try {
     await pool.query(`UPDATE tutor_profiles SET is_approved=true, approval_status='approved' WHERE user_id=$1`, [req.params.userId]);
+    
+    // Send approval email to tutor
+    const tutor = await pool.query(
+      'SELECT u.email, u.first_name, u.last_name FROM users u WHERE u.id=$1',
+      [req.params.userId]
+    );
+    if(tutor.rows[0]) {
+      const { Resend } = require('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      resend.emails.send({
+        from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+        to: tutor.rows[0].email,
+        subject: '🎉 Ваш профиль одобрен на Bilimly.kg!',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:#0ABAB5;padding:24px;text-align:center;">
+              <h1 style="color:white;font-size:1.5rem;margin:0">Bilimly.kg</h1>
+            </div>
+            <div style="padding:32px;background:#f9fafb;">
+              <h2 style="color:#0a0a0a">Поздравляем, ${tutor.rows[0].first_name}! 🎉</h2>
+              <p style="font-size:1rem;color:#374151">Ваш профиль репетитора был одобрен. Теперь вы видны на bilimly.kg и студенты могут записываться к вам.</p>
+              <div style="background:white;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #e5e7eb;">
+                <p><strong>Что делать дальше:</strong></p>
+                <p>✅ Войдите в кабинет репетитора</p>
+                <p>✅ Убедитесь что профиль заполнен полностью</p>
+                <p>✅ Добавьте видео-презентацию если ещё не добавили</p>
+                <p>✅ Установите своё расписание</p>
+              </div>
+              <a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;font-size:1rem;">Открыть кабинет репетитора →</a>
+            </div>
+            <div style="padding:16px;text-align:center;color:#6b7280;font-size:0.8rem;">
+              © 2026 Bilimly.kg · Бишкек, Кыргызстан
+            </div>
+          </div>
+        `
+      }).catch(console.error);
+    }
+    
     res.json({ message: 'Tutor approved' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
