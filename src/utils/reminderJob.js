@@ -34,6 +34,13 @@ const startReminderJob = () => {
           booking.meeting_url
         );
 
+        // Send Telegram reminder to student
+const { sendLessonReminder: sendTelegramReminder } = require('../services/telegramService');
+const studentTg = await pool.query('SELECT telegram_chat_id FROM users WHERE id=$1',[booking.student_id]);
+if(studentTg.rows[0]?.telegram_chat_id){
+  sendTelegramReminder(studentTg.rows[0].telegram_chat_id,booking.student_name,booking.tutor_name,booking.subject,booking.start_time,true).catch(console.error);
+}
+
         // Send reminder to tutor
         await sendLessonReminder(
           booking.tutor_email,
@@ -43,6 +50,12 @@ const startReminderJob = () => {
           booking.start_time,
           booking.meeting_url
         );
+
+        // Send Telegram reminder to tutor
+const tutorTg = await pool.query('SELECT telegram_chat_id FROM users WHERE id=$1',[booking.tutor_id]);
+if(tutorTg.rows[0]?.telegram_chat_id){
+  sendTelegramReminder(tutorTg.rows[0].telegram_chat_id,booking.tutor_name,booking.student_name,booking.subject,booking.start_time,false).catch(console.error);
+}
 
         // Mark reminder as sent
         await pool.query(
