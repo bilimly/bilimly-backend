@@ -72,6 +72,15 @@ try {
     );
   }
 } catch(e) {}
+    // Notify tutor by email
+    try{
+      const tutorData=await pool.query("SELECT u.phone,u.email,u.first_name FROM users u WHERE u.id=$1",[tutor_id]);
+      if(tutorData.rows[0]){
+        const {Resend}=require("resend");
+        const resend=new Resend(process.env.RESEND_API_KEY);
+        resend.emails.send({from:`Bilimly.kg <${process.env.FROM_EMAIL}>`,to:tutorData.rows[0].email,subject:"📅 Новое бронирование на Bilimly.kg!",html:`<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimly.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`}).catch(console.error);
+      }
+    }catch(e){}
     res.status(201).json({
       booking: booking.rows[0],
       payment: {
