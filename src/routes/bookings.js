@@ -312,3 +312,45 @@ router.post('/:id/review', auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── RECURRING BOOKING ──────────────────────────────────────
+router.post('/recurring', auth, async (req, res) => {
+  const { tutor_id, days, start_time, end_time, subject, weeks, student_notes } = req.body;
+  try {
+    const bookings = [];
+    const today = new Date();
+    
+    for (let week = 0; week < (weeks || 4); week++) {
+      for (const day of days) {
+        const date = new Date(today);
+        const daysUntil = (day - today.getDay() + 7) % 7 + (week * 7);
+        date.setDate(today.getDate() + daysUntil);
+        
+        if (date <= today) continue;
+        
+        const result = await pool.query(
+          `INSERT INTO bookings 
+            (student_id, tutor_id, lesson_date, start_time, end_time, 
+             subject, student_notes, status, lesson_type, amount,
+             is_recurring, recurring_days, recurring_time)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'pending','regular',
+             (SELECT hourly_rate FROM tutor_profiles WHERE user_id=$2),
+             true,$8,$4)
+           RETURNING id`,
+          [req.user.id, tutor_id, date.toISOString().split('T')[0],
+           start_time, end_time, subject, student_notes, days]
+        );
+        bookings.push(result.rows[0].id);
+      }
+    }
+    
+    res.status(201).json({ 
+      message: `${bookings.length} уроков забронировано!`,
+      booking_ids: bookings,
+      total: bookings.length
+    });
+  } catch(err) {
+    console.error('Recurring booking error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
