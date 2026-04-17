@@ -262,6 +262,30 @@ const migrate = async () => {
         ADD COLUMN IF NOT EXISTS meeting_tutor_url TEXT;
     `);
 
+    // ── LEADS (Ad Capture) ─────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS leads (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        phone VARCHAR(20) NOT NULL,
+        grade_band VARCHAR(30) NOT NULL
+          CHECK (grade_band IN ('primary','middle','high','ort_university')),
+        subject VARCHAR(50) NOT NULL,
+        urgency VARCHAR(20) NOT NULL
+          CHECK (urgency IN ('this_week','this_month','exploring')),
+        status VARCHAR(20) DEFAULT 'new'
+          CHECK (status IN ('new','contacted','converted','dead')),
+        source VARCHAR(50) DEFAULT 'lead_capture_page',
+        matched_tutor_ids UUID[] DEFAULT '{}',
+        notes TEXT,
+        contacted_at TIMESTAMP,
+        converted_at TIMESTAMP,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
     // ── INDEXES FOR PERFORMANCE ────────────────────────────
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -271,6 +295,9 @@ const migrate = async () => {
       CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(lesson_date);
       CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
       CREATE INDEX IF NOT EXISTS idx_reviews_tutor ON reviews(tutor_id);
+      CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+      CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_leads_urgency ON leads(urgency);
     `);
 
     await client.query('COMMIT');

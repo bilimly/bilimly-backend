@@ -37,6 +37,7 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/packages', require('./routes/packages'));
 app.use('/api/earnings', require('./routes/earnings'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/leads', require('./src/routes/leads'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 
