@@ -26,6 +26,22 @@ app.use('/api/subjects', require('./src/routes/subjects'));
 app.use('/api/support', require('./src/routes/support'));
 app.use('/api/admin', require('./src/routes/admin'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
-app.use((err, req, res, next) => res.status(500).json({ error: 'Server error' }));
+app.use((err, req, res, next) => {
+  try {
+    const { notifyAdminError } = require('./src/services/telegramService');
+    notifyAdminError(req.originalUrl || 'unknown', err).catch(() => {});
+  } catch (e) { /* swallow */ }
+  console.error('[SERVER ERROR]', req.originalUrl, err);
+  res.status(500).json({ error: 'Server error' });
+});
 const PORT = process.env.PORT || process.env.PORT || 3001;
+
+// Start daily admin summary cron
+try {
+  const { startDailySummaryCron } = require('./src/services/adminDailySummary');
+  startDailySummaryCron();
+} catch (e) {
+  console.error('[CRON] Failed to start daily summary:', e);
+}
+
 app.listen(PORT, '0.0.0.0', () => console.log('BILIMLY RUNNING on port ' + PORT));

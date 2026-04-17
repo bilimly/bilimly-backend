@@ -141,6 +141,15 @@ router.post(
         [phone, grade_band, subject, urgency, source, matchedIds, ipAddress, userAgent]
       );
 
+      // Fire-and-forget admin notification; never blocks response
+      try {
+        const { notifyAdminNewLead } = require('../services/telegramService');
+        notifyAdminNewLead(
+          { phone, grade_band, subject, urgency },
+          matchedTutors
+        ).catch((e) => console.error('[LEADS] Admin notify failed:', e));
+      } catch (e) { /* swallow */ }
+
       return res.status(201).json({
         success: true,
         lead_id: insertResult.rows[0].id,

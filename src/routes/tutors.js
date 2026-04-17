@@ -94,6 +94,18 @@ router.post('/apply', async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [full_name, email, phone, subjects||[], experience_years||0, hourly_rate||500, about||'']
     );
+
+    // Admin Telegram notification — new tutor application
+    try {
+      const { notifyAdminNewTutorApplication } = require('../services/telegramService');
+      notifyAdminNewTutorApplication({
+        full_name, email, phone,
+        subjects: subjects || [],
+        experience_years: experience_years || 0,
+        hourly_rate: hourly_rate || 500,
+      }).catch((e) => console.error('[TUTORS/APPLY] Admin notify failed:', e));
+    } catch (e) { /* swallow */ }
+
     res.status(201).json({ message: 'Application submitted!', id: result.rows[0].id });
   } catch (err) {
     res.status(500).json({ error: err.message });

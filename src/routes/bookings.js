@@ -97,6 +97,20 @@ try {
     }catch(e){}
       }
     }catch(e){}
+    // Admin Telegram notification — single booking
+    try {
+      const { notifyAdminNewBooking } = require('../services/telegramService');
+      const studentFull = await pool.query('SELECT first_name, last_name FROM users WHERE id=$1', [req.user.id]);
+      const tutorFull = await pool.query(
+        'SELECT u.first_name, u.last_name FROM users u JOIN tutor_profiles tp ON u.id=tp.user_id WHERE tp.id=$1',
+        [tutor_id]
+      );
+      const studentName = studentFull.rows[0] ? `${studentFull.rows[0].first_name} ${studentFull.rows[0].last_name}` : 'Неизвестно';
+      const tutorName = tutorFull.rows[0] ? `${tutorFull.rows[0].first_name} ${tutorFull.rows[0].last_name}` : 'Неизвестно';
+      notifyAdminNewBooking({
+        subject, amount, lessonDate: lesson_date, startTime: start_time, studentName, tutorName,
+      }).catch((e) => console.error('[BOOKINGS] Admin notify failed:', e));
+    } catch (e) { /* swallow */ }
     res.status(201).json({
       booking: booking.rows[0],
       payment: {
@@ -368,7 +382,18 @@ router.post('/recurring', auth, async (req, res) => {
         bookings.push(result.rows[0].id);
       }
     }
-    
+    // Admin Telegram notification — recurring bookings batch
+    try {
+      const { sendMessage } = require('../services/telegramService');
+      const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+      if (adminChatId) {
+        const msg =
+          `💰 <b>Новые повторяющиеся бронирования</b>\n\n` +
+          `📚 Уроков: <b>${bookings.length}</b>\n` +
+          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+        sendMessage(adminChatId, msg).catch((e) => console.error('[BOOKINGS/RECURRING] Admin notify failed:', e));
+      }
+    } catch (e) { /* swallow */ }
     res.status(201).json({ 
       message: `${bookings.length} уроков забронировано!`,
       booking_ids: bookings,
@@ -405,7 +430,20 @@ router.post('/packages/buy', auth, async (req, res) => {
       [req.user.id, tutor_id, subject, lessons, 
        pricePerLesson, totalAmount, discount, expiresAt]
     );
-
+// Admin Telegram notification — lesson package purchased
+    try {
+      const { sendMessage } = require('../services/telegramService');
+      const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+      if (adminChatId) {
+        const msg =
+          `📦 <b>Куплен пакет уроков</b>\n\n` +
+          `📚 Уроков: <b>${lessons}</b>\n` +
+          `💵 Сумма: <b>${Math.round(totalAmount)} сом</b>\n` +
+          `💰 Цена за урок: ${Math.round(pricePerLesson)} сом (скидка ${discount}%)\n` +
+          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+        sendMessage(adminChatId, msg).catch((e) => console.error('[PACKAGES] Admin notify failed:', e));
+      }
+    } catch (e) { /* swallow */ }
     res.status(201).json({
       package: result.rows[0],
       summary: {
