@@ -302,7 +302,15 @@ const migrate = async () => {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
+// ── TUTOR CLAIM TOKENS (admin-created tutors) ──────────
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS claim_token VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS claim_expires_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS claim_used_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS created_by_admin_id UUID REFERENCES users(id) ON DELETE SET NULL;
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_users_claim_token ON users(claim_token) WHERE claim_token IS NOT NULL;`);
     // ── PARENT PAYMENT PIN ─────────────────────────────────
     await client.query(`
       ALTER TABLE users
