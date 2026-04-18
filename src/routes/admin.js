@@ -332,3 +332,119 @@ router.put('/tutors/:userId/reject', async (req, res) => {
     res.json({ message: 'Tutor rejected' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+// ═══════════════════════════════════════════════════════════
+// LEADS — ad-captured parent leads
+// ═══════════════════════════════════════════════════════════
+
+// GET /api/admin/leads — list leads with filters + stats
+router.get('/leads', async (req, res) => {
+  const { status, urgency, limit = 100, page = 1 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  const params = [];
+  const where = [];
+  if (status) { params.push(status); where.push(`l.status = $${params.length}`); }
+  if (urgency) { params.push(urgency); where.push(`l.urgency = $${params.length}`); }
+  const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+  try {
+    // Main list — include matched tutor names for quick display
+    params.push(parseInt(limit), offset);
+    const list = await pool.query(
+      `SELECT l.id, l.phone, l.grade_band, l.subject, l.urgency, l.status,
+              l.source, l.notes, l.matched_tutor_ids,
+              l.contacted_at, l.converted_at, l.created_at,
+              (
+                SELECT json_agg(json_build_object(
+                  'id', tp.id,
+                  'name', u.first_name || ' ' || u.last_name,
+                  'hourly_rate', tp.hourly_rate
+                ))
+                FROM tutor_profiles tp
+                JOIN users u ON u.id = tp.user_id
+                WHERE tp.id = ANY(l.matched_tutor_ids)
+              ) AS matched_tutors
+         FROM leads l
+         ${whereClause}
+         ORDER BY
+           CASE l.status WHEN 'new' THEN 0 WHEN 'contacted' THEN 1 ELSE 2 END,
+           CASE l.urgency WHEN 'this_week' THEN 0 WHEN 'this_month' THEN 1 ELSE 2 END,
+           l.created_at DESC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    // Counts for the UI status badges
+    const counts = await pool.query(
+      `SELECT status, COUNT(*)::int AS c FROM leads GROUP BY status`
+    );
+    const byStatus = { new: 0, contacted: 0, converted: 0, dead: 0 };
+    counts.rows.forEach(r => { byStatus[r.status] = r.c; });
+
+    const urgencyCounts = await pool.query(
+      `SELECT urgency, COUNT(*)::int AS c FROM leads
+       WHERE status IN ('new','contacted') GROUP BY urgency`
+    );
+    const byUrgency = { this_week: 0, this_month: 0, exploring: 0 };
+    urgencyCounts.rows.forEach(r => { byUrgency[r.urgency] = r.c; });
+
+    res.json({
+      leads: list.rows,
+      total: list.rows.length,
+      counts: { by_status: byStatus, by_urgency: byUrgency },
+    });
+  } catch (err) {
+    console.error('[ADMIN/LEADS] list error:', err);
+    res.status(500).json({ error: 'Failed to fetch leads' });
+  }
+});
+
+// PATCH /api/admin/leads/:id — update status and/or notes
+router.patch('/leads/:id', async (req, res) => {
+  const { status, notes } = req.body;
+  const allowedStatuses = ['new', 'contacted', 'converted', 'dead'];
+
+  if (status && !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const updates = [];
+  const values = [];
+  let idx = 1;
+
+  if (status) {
+    updates.push(`status = $${idx++}`);
+    values.push(status);
+    if (status === 'contacted') {
+      updates.push(`contacted_at = COALESCE(contacted_at, NOW())`);
+    }
+    if (status === 'converted') {
+      updates.push(`converted_at = NOW()`);
+      updates.push(`contacted_at = COALESCE(contacted_at, NOW())`);
+    }
+  }
+  if (notes !== undefined) {
+    updates.push(`notes = $${idx++}`);
+    values.push(notes);
+  }
+  if (!updates.length) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  updates.push(`updated_at = NOW()`);
+  values.push(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE leads SET ${updates.join(', ')}
+         WHERE id = $${idx}
+         RETURNING *`,
+      values
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Lead not found' });
+    res.json({ lead: result.rows[0] });
+  } catch (err) {
+    console.error('[ADMIN/LEADS] update error:', err);
+    res.status(500).json({ error: 'Failed to update lead' });
+  }
+});
