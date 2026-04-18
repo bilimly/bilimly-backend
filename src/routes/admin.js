@@ -1,6 +1,9 @@
 const express = require('express');
 const pool = require('../config/database');
 const { auth, requireRole } = require('../middleware/auth');
+const multer = require('multer');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const router = express.Router();
 
 // All admin routes require auth + admin role
@@ -450,3 +453,174 @@ router.patch('/leads/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update lead' });
   }
 });
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN TUTOR ONBOARDING
+// Admin creates tutor profile on their behalf, generates magic link.
+// Tutor receives link via WhatsApp, clicks to set password and claim.
+// ═══════════════════════════════════════════════════════════
+
+// Multer config — 60MB max, memory storage (we stream to Cloudinary)
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 60 * 1024 * 1024 }, // 60 MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('video/')) {
+      return cb(new Error('Only video files allowed'));
+    }
+    cb(null, true);
+  },
+});
+
+// POST /api/admin/tutors/onboard
+// Multipart: fields + optional 'video' file
+// Fields: first_name, last_name, phone, email, subjects (JSON array), hourly_rate, trial_rate, bio_ru, city, video_url (optional)
+router.post('/tutors/onboard',
+  // We add multer ONLY for this one route to avoid interfering with JSON body parsing on other admin routes.
+  (req, res, next) => {
+    videoUpload.single('video')(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'Видео слишком большое (макс 60 МБ). Попросите репетитора переотправить в сжатом виде.' });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const {
+      first_name,
+      last_name,
+      phone,
+      email,
+      subjects, // may arrive as JSON string or array
+      hourly_rate,
+      trial_rate,
+      bio_ru,
+      city,
+      video_url,
+    } = req.body;
+
+    // Basic validation
+    if (!first_name || !last_name || !phone) {
+      return res.status(400).json({ error: 'first_name, last_name, phone обязательны' });
+    }
+
+    // Parse subjects if arrived as string
+    let subjectsArr = [];
+    if (typeof subjects === 'string') {
+      try { subjectsArr = JSON.parse(subjects); } catch (e) { subjectsArr = [subjects]; }
+    } else if (Array.isArray(subjects)) {
+      subjectsArr = subjects;
+    }
+
+    // Generate email if not provided — some WhatsApp tutors won't have one
+    let finalEmail = (email || '').trim().toLowerCase();
+    if (!finalEmail) {
+      const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+      finalEmail = `tutor_${cleanPhone}@bilimly.kg`;
+    }
+
+    try {
+      // Check for duplicate email
+      const existing = await pool.query('SELECT id FROM users WHERE email = $1', [finalEmail]);
+      if (existing.rows[0]) {
+        return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
+      }
+
+      // Generate claim token (7 day expiry)
+      const claimToken = crypto.randomBytes(32).toString('hex');
+      const claimExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      // Random strong password — tutor replaces on claim
+      const tempPassword = crypto.randomBytes(24).toString('base64');
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+      // Create user
+      const userResult = await pool.query(
+        `INSERT INTO users
+           (email, password_hash, first_name, last_name, phone, role, is_verified,
+            claim_token, claim_expires_at, created_by_admin_id)
+         VALUES ($1, $2, $3, $4, $5, 'tutor', false, $6, $7, $8)
+         RETURNING id, email, first_name, last_name`,
+        [finalEmail, passwordHash, first_name, last_name, phone, claimToken, claimExpiresAt, req.user.id]
+      );
+      const user = userResult.rows[0];
+
+      // Handle video: Cloudinary upload OR URL
+      let videoIntroUrl = null;
+      if (req.file) {
+        try {
+          const { uploadVideo } = require('../services/cloudinaryService');
+          const result = await uploadVideo(
+            req.file.buffer,
+            'bilimly/tutor-videos',
+            `tutor_${user.id}`
+          );
+          videoIntroUrl = result.url;
+        } catch (uploadErr) {
+          console.error('[ADMIN/ONBOARD] Cloudinary upload failed:', uploadErr);
+          // Roll back user creation
+          await pool.query('DELETE FROM users WHERE id = $1', [user.id]);
+          return res.status(500).json({ error: 'Ошибка загрузки видео: ' + (uploadErr.message || 'unknown') });
+        }
+      } else if (video_url) {
+        videoIntroUrl = video_url.trim();
+      }
+
+      // Create tutor profile (pending approval so it shows in existing queue)
+      await pool.query(
+        `INSERT INTO tutor_profiles
+           (user_id, bio_ru, subjects, hourly_rate, trial_rate, city,
+            video_intro_url, is_approved, approval_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'pending')`,
+        [
+          user.id,
+          bio_ru || '',
+          subjectsArr,
+          parseFloat(hourly_rate) || 500,
+          parseFloat(trial_rate) || 200,
+          city || 'Бишкек',
+          videoIntroUrl,
+        ]
+      );
+
+      // Build the magic link (frontend will handle it)
+      const claimLink = `https://www.bilimly.kg/tutor-claim.html?token=${claimToken}`;
+
+      // Pre-filled WhatsApp message the admin copy-pastes
+      const whatsappMessage = `Привет, ${first_name}! 👋\n\nТвой профиль создан на Bilimly.kg. Нажми эту ссылку чтобы установить пароль и активировать аккаунт:\n\n${claimLink}\n\nССылка действует 7 дней. После активации ты сможешь получать студентов.`;
+
+      // Admin Telegram notification
+      try {
+        const { notifyAdminNewTutorApplication } = require('../services/telegramService');
+        notifyAdminNewTutorApplication({
+          full_name: `${first_name} ${last_name}`,
+          email: finalEmail,
+          phone,
+          subjects: subjectsArr,
+          hourly_rate: parseFloat(hourly_rate) || 500,
+          experience_years: 0,
+        }).catch((e) => console.error('[ADMIN/ONBOARD] Telegram notify failed:', e));
+      } catch (e) { /* swallow */ }
+
+      res.status(201).json({
+        success: true,
+        tutor: {
+          user_id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone,
+        },
+        claim_link: claimLink,
+        whatsapp_message: whatsappMessage,
+        whatsapp_url: `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(whatsappMessage)}`,
+      });
+    } catch (err) {
+      console.error('[ADMIN/ONBOARD] Error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
