@@ -19,6 +19,7 @@ app.use('/api/packages', require('./src/routes/packages'));
 app.use('/api/earnings', require('./src/routes/earnings'));
 app.use('/api/messages', require('./src/routes/messages'));
 app.use('/api/leads', require('./src/routes/leads'));
+app.use('/api/children', require('./src/routes/children'));
 const passport = require('passport');
 app.use(passport.initialize());
 app.use('/api/telegram', require('./src/routes/telegram'));
