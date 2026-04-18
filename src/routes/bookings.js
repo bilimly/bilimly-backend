@@ -249,6 +249,20 @@ router.post('/:id/complete', auth, async (req, res) => {
         [booking.rows[0].tutor_id]
       );
     }
+    // Record commission earnings for this lesson
+    try {
+      const { recordLessonEarnings } = require('../services/commissionService');
+      const fullBooking = await pool.query(
+        `SELECT id, tutor_id, amount, duration_minutes FROM bookings WHERE id = $1`,
+        [req.params.id]
+      );
+      if (fullBooking.rows[0]) {
+        await recordLessonEarnings(pool, fullBooking.rows[0]);
+      }
+    } catch (earnErr) {
+      console.error('[BOOKINGS] Failed to record earnings:', earnErr);
+      // Don't fail the complete-request if earnings recording fails
+    }
     res.json({ message: 'Lesson completed' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to complete booking' });

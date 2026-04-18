@@ -166,5 +166,123 @@ router.get('/schedule', auth, requireRole('tutor'), async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch schedule' });
   }
 });
+// ═══════════════════════════════════════════════════════════
+// LEDGER-BASED EARNINGS (source of truth going forward)
+// Uses tutor_earnings table populated by commissionService on lesson complete.
+// Legacy /overview and /transactions remain for backward compat with tutor dashboard.
+// ═══════════════════════════════════════════════════════════
 
+// GET /api/earnings/my-summary — tutor's tier + lifetime + pending/released totals
+router.get('/my-summary', auth, requireRole('tutor'), async (req, res) => {
+  try {
+    const tutor = await pool.query(
+      `SELECT id, total_paid_hours, lifetime_earnings_gross, lifetime_earnings_net,
+              wallet_balance
+         FROM tutor_profiles WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (!tutor.rows[0]) return res.status(404).json({ error: 'Tutor profile not found' });
+    const tp = tutor.rows[0];
+
+    const { tierForHours, COMMISSION_TIERS } = require('../services/commissionService');
+    const tier = tierForHours(tp.total_paid_hours || 0);
+
+    // Ledger aggregates
+    const ledger = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN status='pending' THEN net_amount ELSE 0 END), 0) AS pending_net,
+         COALESCE(SUM(CASE WHEN status='released' THEN net_amount ELSE 0 END), 0) AS released_net,
+         COALESCE(SUM(CASE WHEN status='paid_out' THEN net_amount ELSE 0 END), 0) AS paid_out_net,
+         COUNT(*) FILTER (WHERE status='pending') AS pending_count,
+         COUNT(*) FILTER (WHERE status='released') AS released_count,
+         COUNT(*) FILTER (WHERE status='paid_out') AS paid_out_count
+       FROM tutor_earnings WHERE tutor_id = $1`,
+      [tp.id]
+    );
+
+    res.json({
+      tier: {
+        commission_percent: tier.commission_percent,
+        current_hours: parseFloat(tp.total_paid_hours) || 0,
+        next_tier_hours: tier.next_tier_hours,
+        next_tier_commission: tier.next_tier_commission,
+        hours_to_next: tier.hours_to_next,
+        all_tiers: COMMISSION_TIERS,
+      },
+      lifetime: {
+        gross: parseFloat(tp.lifetime_earnings_gross) || 0,
+        net: parseFloat(tp.lifetime_earnings_net) || 0,
+      },
+      wallet: {
+        balance: parseFloat(tp.wallet_balance) || 0,
+      },
+      ledger: {
+        pending_net: parseFloat(ledger.rows[0].pending_net) || 0,
+        released_net: parseFloat(ledger.rows[0].released_net) || 0,
+        paid_out_net: parseFloat(ledger.rows[0].paid_out_net) || 0,
+        pending_count: parseInt(ledger.rows[0].pending_count) || 0,
+        released_count: parseInt(ledger.rows[0].released_count) || 0,
+        paid_out_count: parseInt(ledger.rows[0].paid_out_count) || 0,
+      },
+    });
+  } catch (err) {
+    console.error('[EARNINGS] my-summary error:', err);
+    res.status(500).json({ error: 'Failed to fetch earnings summary' });
+  }
+});
+
+// GET /api/earnings/ledger — paginated list of earnings entries
+router.get('/ledger', auth, requireRole('tutor'), async (req, res) => {
+  const { page = 1, limit = 20, status } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+  try {
+    const tutor = await pool.query(
+      `SELECT id FROM tutor_profiles WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (!tutor.rows[0]) return res.status(404).json({ error: 'Tutor profile not found' });
+
+    const params = [tutor.rows[0].id];
+    let where = `WHERE te.tutor_id = $1`;
+    if (status) {
+      params.push(status);
+      where += ` AND te.status = $${params.length}`;
+    }
+    params.push(parseInt(limit), offset);
+
+    const result = await pool.query(
+      `SELECT te.id, te.booking_id, te.gross_amount, te.commission_percent,
+              te.commission_amount, te.net_amount, te.tier_hours_at_time,
+              te.status, te.released_at, te.paid_out_at, te.created_at,
+              b.lesson_date, b.start_time, b.subject,
+              us.first_name AS student_first_name,
+              us.last_name AS student_last_name
+         FROM tutor_earnings te
+         LEFT JOIN bookings b ON te.booking_id = b.id
+         LEFT JOIN users us ON b.student_id = us.id
+         ${where}
+         ORDER BY te.created_at DESC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json({ entries: result.rows });
+  } catch (err) {
+    console.error('[EARNINGS] ledger error:', err);
+    res.status(500).json({ error: 'Failed to fetch ledger' });
+  }
+});
+
+// POST /api/earnings/admin/release/:earningsId — admin releases pending earnings to tutor wallet
+// Used once admin verifies lesson happened + payment cleared.
+router.post('/admin/release/:earningsId', auth, requireRole('admin'), async (req, res) => {
+  try {
+    const { releaseEarnings } = require('../services/commissionService');
+    const result = await releaseEarnings(pool, req.params.earningsId);
+    if (!result) return res.status(404).json({ error: 'Earnings entry not found or already released' });
+    res.json({ success: true, earnings: result });
+  } catch (err) {
+    console.error('[EARNINGS] admin release error:', err);
+    res.status(500).json({ error: 'Failed to release earnings' });
+  }
+});
 module.exports = router;
