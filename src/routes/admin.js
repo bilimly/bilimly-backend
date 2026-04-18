@@ -314,8 +314,10 @@ router.get('/applications/full', async (req, res) => {
         (SELECT COUNT(*) FROM bookings WHERE tutor_id = u.id) as total_lessons
       FROM users u
       JOIN tutor_profiles tp ON u.id = tp.user_id
-      WHERE u.role = 'tutor' AND tp.approval_status != 'approved'
-      ORDER BY u.created_at DESC
+      WHERE u.role = 'tutor'
+        AND COALESCE(tp.approval_status, 'pending') = 'pending'
+      ORDER BY tp.updated_at DESC NULLS LAST, u.created_at DESC
+      
     `);
     res.json(result.rows);
   } catch(err) {
