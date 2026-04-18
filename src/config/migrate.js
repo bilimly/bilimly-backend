@@ -285,7 +285,86 @@ const migrate = async () => {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
+// ── CHILDREN (sub-accounts for parent) ─────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS children (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        parent_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        grade_band VARCHAR(30)
+          CHECK (grade_band IN ('primary','middle','high','ort_university')),
+        grade_number INTEGER,
+        school VARCHAR(200),
+        notes TEXT,
+        avatar_url TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
 
+    // ── PARENT PAYMENT PIN ─────────────────────────────────
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS payments_pin_hash VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS pin_failed_attempts INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS pin_locked_until TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS pin_reset_token VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS pin_reset_expires TIMESTAMP;
+    `);
+
+    // ── BOOKINGS: link to child (nullable — old bookings stay intact) ──
+    await client.query(`
+      ALTER TABLE bookings
+        ADD COLUMN IF NOT EXISTS child_id UUID REFERENCES children(id) ON DELETE SET NULL;
+    `);
+
+    // ── TUTOR COMMISSION TIER TRACKING ─────────────────────
+    await client.query(`
+      ALTER TABLE tutor_profiles
+        ADD COLUMN IF NOT EXISTS total_paid_hours DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS lifetime_earnings_gross DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS lifetime_earnings_net DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS wallet_balance DECIMAL(12,2) DEFAULT 0;
+    `);
+
+    // ── TUTOR EARNINGS LEDGER ──────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tutor_earnings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tutor_id UUID REFERENCES tutor_profiles(id) ON DELETE CASCADE,
+        booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+        gross_amount DECIMAL(10,2) NOT NULL,
+        commission_percent DECIMAL(5,2) NOT NULL,
+        commission_amount DECIMAL(10,2) NOT NULL,
+        net_amount DECIMAL(10,2) NOT NULL,
+        tier_hours_at_time DECIMAL(10,2),
+        status VARCHAR(20) DEFAULT 'pending'
+          CHECK (status IN ('pending','released','paid_out','refunded','cancelled')),
+        released_at TIMESTAMP,
+        paid_out_at TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // ── TUTOR PAYOUTS (when you transfer money to their MBank) ─────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tutor_payouts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tutor_id UUID REFERENCES tutor_profiles(id) ON DELETE CASCADE,
+        amount DECIMAL(10,2) NOT NULL,
+        method VARCHAR(30) DEFAULT 'mbank'
+          CHECK (method IN ('mbank','bank_transfer','cash','other')),
+        reference VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'pending'
+          CHECK (status IN ('pending','completed','failed','cancelled')),
+        initiated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        completed_at TIMESTAMP
+      );
+    `);
     // ── INDEXES FOR PERFORMANCE ────────────────────────────
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -298,6 +377,11 @@ const migrate = async () => {
       CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
       CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_leads_urgency ON leads(urgency);
+      CREATE INDEX IF NOT EXISTS idx_children_parent ON children(parent_user_id);
+      CREATE INDEX IF NOT EXISTS idx_bookings_child ON bookings(child_id);
+      CREATE INDEX IF NOT EXISTS idx_tutor_earnings_tutor ON tutor_earnings(tutor_id, status);
+      CREATE INDEX IF NOT EXISTS idx_tutor_earnings_booking ON tutor_earnings(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_tutor_payouts_tutor ON tutor_payouts(tutor_id, status);
     `);
 
     await client.query('COMMIT');
