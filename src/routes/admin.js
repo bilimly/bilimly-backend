@@ -292,11 +292,120 @@ router.put('/applications/:id/reject', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT /api/admin/bookings/:id/confirm
+// Admin marks payment received → does ALL the downstream work:
+//   1. Update booking status -> confirmed
+//   2. Mark payment completed (manual confirmation)
+//   3. Create video room (Jitsi/Daily.co) with room URL
+//   4. Email both parent and tutor with confirmation + video link
+//   5. Telegram ping both (if linked)
 router.put('/bookings/:id/confirm', async (req, res) => {
+  const bookingId = req.params.id;
   try {
-    await pool.query(`UPDATE bookings SET status='confirmed' WHERE id=$1`, [req.params.id]);
-    res.json({ message: 'Confirmed' });
-  } catch(err) { res.status(500).json({ error: err.message }); }
+    // 1. Update booking status
+    await pool.query(
+      `UPDATE bookings SET status='confirmed', updated_at=NOW() WHERE id=$1`,
+      [bookingId]
+    );
+
+    // 2. Mark payment completed (manual confirmation)
+    await pool.query(
+      `UPDATE payments
+         SET status='completed',
+             paid_at = COALESCE(paid_at, NOW()),
+             mbank_transaction_id = COALESCE(mbank_transaction_id, $1)
+       WHERE booking_id=$2 AND status != 'completed'`,
+      [`MANUAL_${Date.now()}`, bookingId]
+    );
+
+    // Fetch full booking + user details for downstream actions
+    const fullBooking = await pool.query(
+      `SELECT b.*,
+              s.email AS student_email, s.first_name AS student_first, s.last_name AS student_last,
+              s.phone AS student_phone, s.telegram_chat_id AS student_telegram,
+              u_t.email AS tutor_email, u_t.first_name AS tutor_first, u_t.last_name AS tutor_last,
+              u_t.phone AS tutor_phone, u_t.telegram_chat_id AS tutor_telegram
+         FROM bookings b
+         JOIN users s ON b.student_id = s.id
+         JOIN tutor_profiles tp ON b.tutor_id = tp.id
+         JOIN users u_t ON tp.user_id = u_t.id
+        WHERE b.id = $1`,
+      [bookingId]
+    );
+    const b = fullBooking.rows[0];
+    if (!b) return res.json({ message: 'Confirmed (booking details not found for downstream)' });
+
+    // 3. Create video room
+    let videoRoomUrl = b.meeting_url;
+    if (!videoRoomUrl) {
+      try {
+        const { createLessonRoom } = require('../services/videoService');
+        const room = await createLessonRoom(bookingId, b.duration_minutes || 60);
+        videoRoomUrl = room.room_url;
+      } catch (e) {
+        console.error('[ADMIN/CONFIRM] video room creation failed:', e);
+      }
+    }
+
+    // 4. Email both sides
+    try {
+      const { Resend } = require('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const tutorFullName = `${b.tutor_first} ${b.tutor_last || ''}`.trim();
+      const studentFullName = `${b.student_first} ${b.student_last || ''}`.trim();
+      const dateStr = new Date(b.lesson_date).toLocaleDateString('ru-RU');
+      const videoBlock = videoRoomUrl
+        ? `<a href="${videoRoomUrl}" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;margin-top:12px">🎥 Войти в видео-комнату</a>`
+        : '<p style="color:#666">Ссылка на видео-комнату придёт за 30 минут до урока.</p>';
+
+      // Email to student
+      if (b.student_email) {
+        resend.emails.send({
+          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          to: b.student_email,
+          subject: '✅ Оплата подтверждена — урок забронирован',
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimly.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Оплата подтверждена! 🎉</h2><p>Здравствуйте, <strong>${b.student_first}</strong>! Ваша оплата получена.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👨‍🏫 Репетитор:</strong> ${tutorFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}</div></div>`,
+        }).catch((e) => console.error('[ADMIN/CONFIRM] student email failed:', e));
+      }
+
+      // Email to tutor
+      if (b.tutor_email) {
+        resend.emails.send({
+          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          to: b.tutor_email,
+          subject: '✅ Урок подтверждён — оплата получена',
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimly.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Урок подтверждён! 🎉</h2><p>Здравствуйте, <strong>${b.tutor_first}</strong>! Студент оплатил урок.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👤 Студент:</strong> ${studentFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}<p style="font-size:0.85rem;color:#666;margin-top:16px">Не забудьте подключиться за 5 минут до начала.</p></div></div>`,
+        }).catch((e) => console.error('[ADMIN/CONFIRM] tutor email failed:', e));
+      }
+    } catch (e) { console.error('[ADMIN/CONFIRM] email block failed:', e); }
+
+    // 5. Telegram pings (if linked)
+    try {
+      const { sendMessage } = require('../services/telegramService');
+      const dateStr = new Date(b.lesson_date).toLocaleDateString('ru-RU');
+      const tgVideoLine = videoRoomUrl ? `\n🎥 <a href="${videoRoomUrl}">Войти в видео-комнату</a>` : '';
+
+      if (b.student_telegram) {
+        sendMessage(b.student_telegram,
+          `✅ <b>Оплата подтверждена!</b>\n\nУрок с <b>${b.tutor_first} ${b.tutor_last || ''}</b>\n📅 ${dateStr} в ${b.start_time}${tgVideoLine}`
+        ).catch(() => {});
+      }
+      if (b.tutor_telegram) {
+        sendMessage(b.tutor_telegram,
+          `✅ <b>Урок подтверждён!</b>\n\nСтудент <b>${b.student_first} ${b.student_last || ''}</b> оплатил.\n📅 ${dateStr} в ${b.start_time}${tgVideoLine}`
+        ).catch(() => {});
+      }
+    } catch (e) { console.error('[ADMIN/CONFIRM] telegram block failed:', e); }
+
+    res.json({
+      message: 'Confirmed — payment marked, video room created, notifications sent',
+      booking_id: bookingId,
+      video_room_url: videoRoomUrl,
+    });
+  } catch(err) {
+    console.error('[ADMIN/CONFIRM] error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.put('/bookings/:id/cancel', async (req, res) => {
