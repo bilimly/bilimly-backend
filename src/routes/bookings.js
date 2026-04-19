@@ -461,4 +461,78 @@ router.post('/packages/buy', auth, async (req, res) => {
   }
 });
 
+
+// ── PARENT-INITIATED PAYMENT NOTIFICATION ─────────────────
+// Parent clicks "Я оплатил" after sending WhatsApp screenshot.
+// Updates payment to pending_verification, pings admin via Telegram.
+// Idempotent — calling twice doesn't double-notify.
+router.post('/:id/mark-paid', auth, async (req, res) => {
+  const bookingId = req.params.id;
+  try {
+    // Verify booking belongs to this user
+    const bookingCheck = await pool.query(
+      `SELECT b.*, p.id AS payment_id, p.status AS payment_status,
+              u.first_name AS student_first, u.last_name AS student_last,
+              u_t.first_name AS tutor_first, u_t.last_name AS tutor_last
+         FROM bookings b
+         LEFT JOIN payments p ON p.booking_id = b.id
+         JOIN users u ON b.student_id = u.id
+         JOIN tutor_profiles tp ON b.tutor_id = tp.id
+         JOIN users u_t ON tp.user_id = u_t.id
+        WHERE b.id = $1 AND b.student_id = $2`,
+      [bookingId, req.user.id]
+    );
+    const b = bookingCheck.rows[0];
+    if (!b) return res.status(404).json({ error: 'Бронирование не найдено' });
+
+    // Idempotency: if already pending_verification or completed, just return success
+    if (b.payment_status === 'pending_verification' || b.payment_status === 'completed') {
+      return res.json({
+        message: 'already_marked',
+        payment_status: b.payment_status,
+      });
+    }
+
+    // Update payment to pending_verification
+    if (b.payment_id) {
+      await pool.query(
+        `UPDATE payments SET status='pending_verification', notes=COALESCE(notes,'') || $1 WHERE id=$2`,
+        [`\n[${new Date().toISOString()}] Parent marked as paid`, b.payment_id]
+      );
+    }
+
+    // Telegram ping admin immediately
+    try {
+      const { sendMessage } = require('../services/telegramService');
+      const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+      if (adminChatId) {
+        const dateStr = new Date(b.lesson_date).toLocaleDateString('ru-RU');
+        const studentName = `${b.student_first} ${b.student_last || ''}`.trim();
+        const tutorName = `${b.tutor_first} ${b.tutor_last || ''}`.trim();
+        const shortId = bookingId.substring(0, 8);
+        const msg =
+          `🔔 <b>Родитель сообщил об оплате</b>\n\n` +
+          `Бронь: <code>#${shortId}</code>\n` +
+          `👤 ${studentName}\n` +
+          `👨‍🏫 ${tutorName}\n` +
+          `📚 ${b.subject || 'Урок'}\n` +
+          `📅 ${dateStr} в ${b.start_time}\n` +
+          `💰 ${b.amount} сом\n\n` +
+          `Проверьте чек в WhatsApp и подтвердите:\n` +
+          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+        sendMessage(adminChatId, msg).catch((e) => console.error('[BOOKINGS/MARK-PAID] Telegram failed:', e));
+      }
+    } catch (e) { /* swallow */ }
+
+    res.json({
+      message: 'marked',
+      payment_status: 'pending_verification',
+      next_step: 'Мы получили уведомление и подтвердим в течение 30 минут в рабочее время.',
+    });
+  } catch (err) {
+    console.error('[BOOKINGS/MARK-PAID] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
