@@ -45,4 +45,20 @@ try {
   console.error('[CRON] Failed to start daily summary:', e);
 }
 
+// Start lesson reminder cron (every 15 min, sends 1-hour-before reminders)
+try {
+  const { startReminderJob } = require('./src/utils/reminderJob');
+  startReminderJob();
+} catch (e) {
+  console.error('[CRON] Failed to start reminder job:', e);
+}
+
+// Start video room scheduler (every 15 min, auto-creates Jitsi/Daily.co rooms 45-75 min before confirmed lessons)
+try {
+  const { scheduleRoomCreation } = require('./src/services/videoService');
+  scheduleRoomCreation();
+} catch (e) {
+  console.error('[CRON] Failed to start video room scheduler:', e);
+}
+
 app.listen(PORT, '0.0.0.0', () => console.log('BILIMLY RUNNING on port ' + PORT));
