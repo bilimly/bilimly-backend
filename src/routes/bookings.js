@@ -16,8 +16,8 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
     );
     if (!tutorResult.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
 
-    const tutor = tutorResult.rows[0];
-    const amount = lesson_type === 'trial' ? tutor.trial_rate : tutor.hourly_rate;
+    const tutorRow = tutorResult.rows[0];
+    const amount = lesson_type === 'trial' ? tutorRow.trial_rate : tutorRow.hourly_rate;
 
     // Check for conflicts
     const conflict = await pool.query(
@@ -31,6 +31,7 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
       return res.status(409).json({ error: 'This time slot is already booked' });
     }
 
+    // Insert booking
     const booking = await pool.query(
       `INSERT INTO bookings
         (student_id, tutor_id, lesson_date, start_time, end_time,
@@ -48,7 +49,7 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
       [booking.rows[0].id, req.user.id, amount]
     );
 
-    // Generate Mbank QR
+    // Generate Mbank QR (currently demo placeholder — Batch 5 replaces with real fixed QR)
     const { generateMbankQR } = require('../services/mbankService');
     const qrData = await generateMbankQR(payment.rows[0].id, amount);
 
@@ -56,61 +57,71 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
       'UPDATE payments SET mbank_qr_code=$1, mbank_qr_url=$2 WHERE id=$3',
       [qrData.qr_code, qrData.qr_url, payment.rows[0].id]
     );
-// Send confirmation email
-try {
-  const student = await pool.query('SELECT email, first_name, last_name FROM users WHERE id=$1', [req.user.id]);
-  const tutor = await pool.query('SELECT u.email, u.first_name, u.last_name FROM users u JOIN tutor_profiles tp ON u.id=tp.user_id WHERE tp.id=$1', [tutor_id]);
-  if (student.rows[0] && tutor.rows[0]) {
-    sendBookingConfirmation(
-      student.rows[0].email,
-      student.rows[0].first_name,
-      tutor.rows[0].first_name + ' ' + tutor.rows[0].last_name,
-      subject || 'Урок',
-      lesson_date,
-      start_time,
-      amount
-    );
-  }
-} catch(e) {}
-    // Notify tutor by email
-    try{
-      const tutorData=await pool.query("SELECT u.phone,u.email,u.first_name FROM users u WHERE u.id=$1",[tutor_id]);
-      if(tutorData.rows[0]){
-        const {Resend}=require("resend");
-        const resend=new Resend(process.env.RESEND_API_KEY);
-        resend.emails.send({from:`Bilimly.kg <${process.env.FROM_EMAIL}>`,to:tutorData.rows[0].email,subject:"📅 Новое бронирование на Bilimly.kg!",html:`<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimly.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`}).catch(console.error);
-        // Notify tutor by email
-    try{
-      const tutorData=await pool.query("SELECT u.phone,u.email,u.first_name FROM users u WHERE u.id=$1",[tutor_id]);
-      if(tutorData.rows[0]){
-        const {Resend}=require("resend");
-        const resend=new Resend(process.env.RESEND_API_KEY);
-        resend.emails.send({from:`Bilimly.kg <${process.env.FROM_EMAIL}>`,to:tutorData.rows[0].email,subject:"📅 Новое бронирование на Bilimly.kg!",html:`<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimly.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`}).catch(console.error);
 
-        // Telegram notification to tutor
-        const {sendBookingNotification}=require('../services/telegramService');
-        const tgUser=await pool.query('SELECT telegram_chat_id FROM users WHERE id=$1',[tutor_id]);
-        if(tgUser.rows[0]?.telegram_chat_id){
-          sendBookingNotification(tgUser.rows[0].telegram_chat_id,tutorData.rows[0].first_name,subject||'Урок','Студент',lesson_date,start_time,true).catch(console.error);
-        }
-      }
-    }catch(e){}
-      }
-    }catch(e){}
-    // Admin Telegram notification — single booking
+    // Fetch student + tutor user records once for all notifications
+    const [studentRow, tutorUserRow] = await Promise.all([
+      pool.query('SELECT email, first_name, last_name FROM users WHERE id=$1', [req.user.id]),
+      pool.query(
+        'SELECT u.email, u.first_name, u.last_name, u.phone, u.telegram_chat_id FROM users u JOIN tutor_profiles tp ON u.id=tp.user_id WHERE tp.id=$1',
+        [tutor_id]
+      ),
+    ]);
+    const student = studentRow.rows[0];
+    const tutorUser = tutorUserRow.rows[0];
+
+    // Notify student by email (booking confirmation)
+    if (student && tutorUser) {
+      sendBookingConfirmation(
+        student.email,
+        student.first_name,
+        `${tutorUser.first_name} ${tutorUser.last_name}`,
+        subject || 'Урок',
+        lesson_date,
+        start_time,
+        amount
+      ).catch(console.error);
+    }
+
+    // Notify tutor by email (single email, not duplicated)
+    if (tutorUser) {
+      try {
+        const { Resend } = require('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        resend.emails.send({
+          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          to: tutorUser.email,
+          subject: '📅 Новое бронирование на Bilimly.kg!',
+          html: `<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimly.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`,
+        }).catch((e) => console.error('[BOOKINGS] tutor email failed:', e));
+      } catch (e) { /* swallow */ }
+    }
+
+    // Notify tutor by Telegram (if linked)
+    if (tutorUser && tutorUser.telegram_chat_id) {
+      try {
+        const { sendBookingNotification } = require('../services/telegramService');
+        sendBookingNotification(
+          tutorUser.telegram_chat_id,
+          tutorUser.first_name,
+          subject || 'Урок',
+          student ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Студент',
+          lesson_date,
+          start_time,
+          true
+        ).catch((e) => console.error('[BOOKINGS] tutor telegram failed:', e));
+      } catch (e) { /* swallow */ }
+    }
+
+    // Notify admin by Telegram
     try {
       const { notifyAdminNewBooking } = require('../services/telegramService');
-      const studentFull = await pool.query('SELECT first_name, last_name FROM users WHERE id=$1', [req.user.id]);
-      const tutorFull = await pool.query(
-        'SELECT u.first_name, u.last_name FROM users u JOIN tutor_profiles tp ON u.id=tp.user_id WHERE tp.id=$1',
-        [tutor_id]
-      );
-      const studentName = studentFull.rows[0] ? `${studentFull.rows[0].first_name} ${studentFull.rows[0].last_name}` : 'Неизвестно';
-      const tutorName = tutorFull.rows[0] ? `${tutorFull.rows[0].first_name} ${tutorFull.rows[0].last_name}` : 'Неизвестно';
+      const studentName = student ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Неизвестно';
+      const tutorName = tutorUser ? `${tutorUser.first_name} ${tutorUser.last_name || ''}`.trim() : 'Неизвестно';
       notifyAdminNewBooking({
         subject, amount, lessonDate: lesson_date, startTime: start_time, studentName, tutorName,
-      }).catch((e) => console.error('[BOOKINGS] Admin notify failed:', e));
+      }).catch((e) => console.error('[BOOKINGS] admin notify failed:', e));
     } catch (e) { /* swallow */ }
+
     res.status(201).json({
       booking: booking.rows[0],
       payment: {
@@ -269,7 +280,7 @@ router.post('/:id/complete', auth, async (req, res) => {
   }
 });
 
-module.exports = router;
+
 
 // ── LESSON SUMMARY ─────────────────────────────────────────
 router.post('/:id/summary', auth, requireRole('tutor'), async (req, res) => {
@@ -341,30 +352,6 @@ router.post('/:id/review', auth, async (req, res) => {
   }
 });
 
-// ── REVIEW AFTER LESSON ────────────────────────────────────
-router.post('/:id/review', auth, async (req, res) => {
-  const { tutor_id, rating, comment } = req.body;
-  try {
-    await pool.query(
-      `INSERT INTO reviews (tutor_id, student_id, booking_id, rating, comment, is_published)
-       VALUES ($1,$2,$3,$4,$5,true)
-       ON CONFLICT (booking_id) DO UPDATE SET rating=$4, comment=$5`,
-      [tutor_id, req.user.id, req.params.id, rating, comment]
-    );
-    await pool.query(
-      `UPDATE tutor_profiles SET
-        rating = (SELECT AVG(rating) FROM reviews WHERE tutor_id=$1 AND is_published=true),
-        review_count = (SELECT COUNT(*) FROM reviews WHERE tutor_id=$1 AND is_published=true)
-       WHERE user_id=$1`,
-      [tutor_id]
-    );
-    await pool.query('UPDATE bookings SET reviewed=true WHERE id=$1',[req.params.id]);
-    res.json({ message: 'Review submitted!' });
-  } catch(err) {
-    console.error('Review error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ── RECURRING BOOKING ──────────────────────────────────────
 router.post('/recurring', auth, async (req, res) => {
@@ -473,3 +460,5 @@ router.post('/packages/buy', auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;
