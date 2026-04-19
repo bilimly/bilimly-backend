@@ -251,16 +251,35 @@ router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
       `UPDATE tutor_profiles SET approval_status='pending', updated_at=NOW() WHERE user_id=$1`,
       [req.user.id]
     );
-    const tutor = await pool.query(
-      'SELECT u.email, u.first_name FROM users u WHERE u.id=$1',
+    // Fetch full profile for the notification payload
+    const profile = await pool.query(
+      `SELECT u.first_name, u.last_name, u.email, u.phone,
+              tp.subjects, tp.hourly_rate, tp.bio_ru, tp.city
+         FROM users u
+         JOIN tutor_profiles tp ON tp.user_id = u.id
+        WHERE u.id = $1`,
       [req.user.id]
     );
-    if (tutor.rows[0]) {
-      const { sendWelcomeEmail } = require('../services/emailService');
-      sendWelcomeEmail('admin@bilimly.kg', tutor.rows[0].first_name + ' submitted for review', 'tutor').catch(console.error);
+
+    if (profile.rows[0]) {
+      const p = profile.rows[0];
+      // Telegram: real-time admin ping
+      try {
+        const { notifyAdminNewTutorApplication } = require('../services/telegramService');
+        notifyAdminNewTutorApplication({
+          full_name: `${p.first_name} ${p.last_name || ''}`.trim(),
+          email: p.email,
+          phone: p.phone || '—',
+          subjects: p.subjects || [],
+          hourly_rate: p.hourly_rate || 0,
+          experience_years: 0,
+        }).catch((e) => console.error('[TUTORS/SUBMIT-REVIEW] Telegram notify failed:', e));
+      } catch (e) { /* swallow */ }
     }
+
     res.json({ message: 'Submitted for review' });
   } catch(err) {
+    console.error('[TUTORS/SUBMIT-REVIEW] error:', err);
     res.status(500).json({ error: err.message });
   }
 });
