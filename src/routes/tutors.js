@@ -1,6 +1,15 @@
 const express = require('express');
 const pool = require('../config/database');
 const { auth, requireRole } = require('../middleware/auth');
+const multer = require('multer');
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Only image files allowed'));
+    cb(null, true);
+  },
+});
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -111,7 +120,58 @@ router.post('/apply', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// POST /api/tutors/avatar — upload profile photo to Cloudinary
+router.post('/avatar',
+  (req, res, next) => {
+    avatarUpload.single('avatar')(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'Фото слишком большое (макс 10 МБ)' });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
+  auth,
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    try {
+      const { v2: cloudinary } = require('cloudinary');
+      // Stream upload to Cloudinary avatars folder
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'image',
+            folder: 'bilimly/avatars',
+            public_id: `user_${req.user.id}`,
+            overwrite: true,
+            transformation: [
+              { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+              { quality: 'auto:good', fetch_format: 'auto' },
+            ],
+          },
+          (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
 
+      // Save URL to user
+      await pool.query(
+        `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`,
+        [uploadResult.secure_url, req.user.id]
+      );
+
+      res.json({ success: true, avatar_url: uploadResult.secure_url });
+    } catch (err) {
+      console.error('[TUTORS/AVATAR] upload error:', err);
+      res.status(500).json({ error: 'Ошибка загрузки фото' });
+    }
+  }
+);
 module.exports = router;
 
 router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
