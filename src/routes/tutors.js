@@ -2,6 +2,13 @@ const express = require('express');
 const pool = require('../config/database');
 const { auth, requireRole } = require('../middleware/auth');
 const multer = require('multer');
+const { v2: cloudinary } = require('cloudinary');
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
@@ -120,14 +127,6 @@ router.post('/apply', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// DIAGNOSTIC: log Cloudinary env var presence at module load time
-console.log('[CLOUDINARY CHECK]', {
-  has_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
-  has_api_key: !!process.env.CLOUDINARY_API_KEY,
-  has_api_secret: !!process.env.CLOUDINARY_API_SECRET,
-  cloud_name_preview: (process.env.CLOUDINARY_CLOUD_NAME || '').substring(0, 4),
-  api_key_length: (process.env.CLOUDINARY_API_KEY || '').length,
-});
 // POST /api/tutors/avatar — upload profile photo to Cloudinary
 router.post('/avatar',
   (req, res, next) => {
@@ -145,7 +144,7 @@ router.post('/avatar',
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
     try {
-      const { v2: cloudinary } = require('cloudinary');
+
       // Stream upload to Cloudinary avatars folder
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
