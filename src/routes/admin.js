@@ -733,3 +733,24 @@ router.post('/tutors/onboard',
     }
   }
 );
+
+// DELETE /api/admin/users/:id — hard delete a user (cascades to profile, packages, etc; SET NULL on bookings/payments/reviews)
+// Use sparingly — for testing or actual account removal at user request.
+router.delete('/users/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (targetId === req.user.id) {
+    return res.status(400).json({ error: 'Нельзя удалить собственный аккаунт' });
+  }
+  try {
+    const result = await pool.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, email',
+      [targetId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) {
+    console.error('[ADMIN/DELETE-USER] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
