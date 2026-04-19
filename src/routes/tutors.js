@@ -127,14 +127,13 @@ router.post('/apply', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// POST /api/tutors/avatar — upload profile photo to Cloudinary
+// POST /api/tutors/avatar — upload profile photo
 router.post('/avatar',
   (req, res, next) => {
     avatarUpload.single('avatar')(req, res, (err) => {
       if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'Фото слишком большое (макс 10 МБ)' });
-        }
+        console.error('[AVATAR] multer error:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Фото слишком большое (макс 10 МБ)' });
         return res.status(400).json({ error: err.message });
       }
       next();
@@ -142,10 +141,12 @@ router.post('/avatar',
   },
   auth,
   async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-    try {
+    console.log('[AVATAR] handler start, user id:', req.user && req.user.id);
+    if (!req.file) { console.log('[AVATAR] no file'); return res.status(400).json({ error: 'Файл не загружен' }); }
 
-      // Stream upload to Cloudinary avatars folder
+    let cloudinaryUrl;
+    try {
+      console.log('[AVATAR] uploading to cloudinary...');
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           {
@@ -153,32 +154,41 @@ router.post('/avatar',
             folder: 'bilimly/avatars',
             public_id: `user_${req.user.id}`,
             overwrite: true,
+            invalidate: true,
             transformation: [
               { width: 400, height: 400, crop: 'fill', gravity: 'face' },
               { quality: 'auto:good', fetch_format: 'auto' },
             ],
           },
-          (err, result) => {
-            if (err) return reject(err);
-            resolve(result);
-          }
+          (err, result) => { if (err) return reject(err); resolve(result); }
         );
         stream.end(req.file.buffer);
       });
-
-      // Save URL to user
-      await pool.query(
-        `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`,
-        [uploadResult.secure_url, req.user.id]
-      );
-
-      res.json({ success: true, avatar_url: uploadResult.secure_url });
+      cloudinaryUrl = uploadResult.secure_url;
+      console.log('[AVATAR] cloudinary url:', cloudinaryUrl);
     } catch (err) {
-      console.error('[TUTORS/AVATAR] upload error:', err);
-      res.status(500).json({ error: 'Ошибка загрузки фото' });
+      console.error('[AVATAR] cloudinary error:', err);
+      return res.status(500).json({ error: 'Cloudinary upload failed: ' + err.message });
+    }
+
+    try {
+      console.log('[AVATAR] running UPDATE for user:', req.user.id);
+      const result = await pool.query(
+        `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, avatar_url`,
+        [cloudinaryUrl, req.user.id]
+      );
+      console.log('[AVATAR] UPDATE result rows:', result.rows);
+      if (!result.rows || result.rows.length === 0) {
+        return res.status(500).json({ error: 'User not found in DB' });
+      }
+      return res.json({ success: true, avatar_url: result.rows[0].avatar_url });
+    } catch (err) {
+      console.error('[AVATAR] db error:', err);
+      return res.status(500).json({ error: 'DB update failed: ' + err.message });
     }
   }
 );
+
 module.exports = router;
 
 router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
