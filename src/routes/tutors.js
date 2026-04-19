@@ -120,6 +120,14 @@ router.post('/apply', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// DIAGNOSTIC: log Cloudinary env var presence at module load time
+console.log('[CLOUDINARY CHECK]', {
+  has_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+  has_api_key: !!process.env.CLOUDINARY_API_KEY,
+  has_api_secret: !!process.env.CLOUDINARY_API_SECRET,
+  cloud_name_preview: (process.env.CLOUDINARY_CLOUD_NAME || '').substring(0, 4),
+  api_key_length: (process.env.CLOUDINARY_API_KEY || '').length,
+});
 // POST /api/tutors/avatar — upload profile photo to Cloudinary
 router.post('/avatar',
   (req, res, next) => {
