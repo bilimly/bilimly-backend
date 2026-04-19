@@ -189,6 +189,60 @@ router.post('/avatar',
   }
 );
 
+// Multer config for video uploads
+const videoUploadTutor = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 60 * 1024 * 1024 }, // 60 MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('video/')) return cb(new Error('Только видео-файлы'));
+    cb(null, true);
+  },
+});
+
+// POST /api/tutors/video-upload — tutor uploads their own intro video to Cloudinary
+router.post('/video-upload',
+  (req, res, next) => {
+    videoUploadTutor.single('video')(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Видео слишком большое (макс 60 МБ)' });
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
+  auth,
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    try {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'video',
+            folder: 'bilimly/tutor-videos',
+            public_id: `tutor_${req.user.id}`,
+            overwrite: true,
+            chunk_size: 6000000,
+            eager: [{ width: 640, height: 360, crop: 'limit', format: 'mp4' }],
+            eager_async: true,
+          },
+          (err, result) => { if (err) return reject(err); resolve(result); }
+        );
+        stream.end(req.file.buffer);
+      });
+
+      await pool.query(
+        `UPDATE tutor_profiles SET video_intro_url = $1 WHERE user_id = $2`,
+        [uploadResult.secure_url, req.user.id]
+      );
+
+      return res.json({ success: true, video_url: uploadResult.secure_url });
+    } catch (err) {
+      console.error('[TUTORS/VIDEO] error:', err);
+      return res.status(500).json({ error: 'Ошибка загрузки видео: ' + err.message });
+    }
+  }
+);
+
 module.exports = router;
 
 router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
