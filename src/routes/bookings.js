@@ -486,7 +486,7 @@ router.post('/:id/mark-paid', auth, async (req, res) => {
     if (!b) return res.status(404).json({ error: 'Бронирование не найдено' });
 
     // Idempotency: if already pending_verification or completed, just return success
-    if (b.payment_status === 'pending_verification' || b.payment_status === 'completed') {
+    if (b.payment_status === 'completed') {
       return res.json({
         message: 'already_marked',
         payment_status: b.payment_status,
@@ -496,7 +496,7 @@ router.post('/:id/mark-paid', auth, async (req, res) => {
     // Update payment to pending_verification
     if (b.payment_id) {
       await pool.query(
-        `UPDATE payments SET status='pending_verification', notes=COALESCE(notes,'') || $1 WHERE id=$2`,
+        `UPDATE payments SET notes=COALESCE(notes,'') || $1 WHERE id=$2`,
         [`\n[${new Date().toISOString()}] Parent marked as paid`, b.payment_id]
       );
     }
