@@ -177,7 +177,7 @@ router.get('/my-summary', auth, requireRole('tutor'), async (req, res) => {
   try {
     const tutor = await pool.query(
       `SELECT id, total_paid_hours, lifetime_earnings_gross, lifetime_earnings_net,
-              wallet_balance
+              wallet_balance, COALESCE(commission_locked_18pct, FALSE) AS is_founding
          FROM tutor_profiles WHERE user_id = $1`,
       [req.user.id]
     );
@@ -185,7 +185,8 @@ router.get('/my-summary', auth, requireRole('tutor'), async (req, res) => {
     const tp = tutor.rows[0];
 
     const { tierForHours, COMMISSION_TIERS } = require('../services/commissionService');
-    const tier = tierForHours(tp.total_paid_hours || 0);
+    const isFounding = tp.is_founding === true;
+    const baseTier = tierForHours(tp.total_paid_hours || 0);
 
     // Ledger aggregates
     const ledger = await pool.query(
@@ -202,12 +203,13 @@ router.get('/my-summary', auth, requireRole('tutor'), async (req, res) => {
 
     res.json({
       tier: {
-        commission_percent: tier.commission_percent,
+        commission_percent: isFounding ? 18 : baseTier.commission_percent,
         current_hours: parseFloat(tp.total_paid_hours) || 0,
-        next_tier_hours: tier.next_tier_hours,
-        next_tier_commission: tier.next_tier_commission,
-        hours_to_next: tier.hours_to_next,
+        next_tier_hours: isFounding ? null : baseTier.next_tier_hours,
+        next_tier_commission: isFounding ? null : baseTier.next_tier_commission,
+        hours_to_next: isFounding ? null : baseTier.hours_to_next,
         all_tiers: COMMISSION_TIERS,
+        is_founding: isFounding,
       },
       lifetime: {
         gross: parseFloat(tp.lifetime_earnings_gross) || 0,
