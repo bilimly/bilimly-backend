@@ -52,15 +52,25 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
-    const reviews = await pool.query(
-      `SELECT r.*, u.first_name, u.last_name 
-       FROM reviews r 
-       JOIN users u ON r.student_id = u.id
-       WHERE r.tutor_id = $1
-       ORDER BY r.created_at DESC LIMIT 20`,
-      [result.rows[0].tutor_id || result.rows[0].id]
-    );
-    res.json({ ...result.rows[0], reviews: reviews.rows });
+    const tutorProfileId = result.rows[0].tutor_id || result.rows[0].id;
+    const [reviews, availability] = await Promise.all([
+      pool.query(
+        `SELECT r.*, u.first_name, u.last_name 
+           FROM reviews r 
+           JOIN users u ON r.student_id = u.id
+          WHERE r.tutor_id = $1
+          ORDER BY r.created_at DESC LIMIT 20`,
+        [tutorProfileId]
+      ),
+      pool.query(
+        `SELECT day_of_week, start_time, end_time
+           FROM tutor_availability
+          WHERE tutor_id = $1 AND is_active = TRUE
+          ORDER BY day_of_week, start_time`,
+        [tutorProfileId]
+      ),
+    ]);
+    res.json({ ...result.rows[0], reviews: reviews.rows, availability: availability.rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
