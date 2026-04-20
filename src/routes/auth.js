@@ -26,7 +26,13 @@ router.post('/register', [
       [email, password_hash, role, first_name, last_name, phone || null, language_preference || 'ru']
     );
     const user = result.rows[0];
-    if (role === 'tutor') await pool.query('INSERT INTO tutor_profiles (user_id) VALUES ($1)', [user.id]);
+    if (role === 'tutor') {
+      const isFoundingPeriod = new Date() < new Date('2026-05-20T23:59:59');
+      await pool.query(
+        'INSERT INTO tutor_profiles (user_id, commission_locked_18pct) VALUES ($1, $2)',
+        [user.id, isFoundingPeriod]
+      );
+    }
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const { sendWelcomeEmail } = require('../services/emailService');
 sendWelcomeEmail(email, first_name, role).catch(console.error);

@@ -132,11 +132,12 @@ router.put('/applications/:id/review', async (req, res) => {
         [email, hash, first_name, last_name, phone]
       );
 
+      const isFoundingPeriod = new Date() < new Date('2026-05-20T23:59:59');
       await pool.query(
-        `INSERT INTO tutor_profiles (user_id, bio_ru, hourly_rate, subjects, is_approved, approval_status)
-         VALUES ($1,$2,$3,$4,true,'approved')
+        `INSERT INTO tutor_profiles (user_id, bio_ru, hourly_rate, subjects, is_approved, approval_status, commission_locked_18pct)
+         VALUES ($1,$2,$3,$4,true,'approved',$5)
          ON CONFLICT (user_id) DO UPDATE SET is_approved=true, approval_status='approved'`,
-        [user.rows[0].id, about, hourly_rate || 500, subjects || []]
+        [user.rows[0].id, about, hourly_rate || 500, subjects || [], isFoundingPeriod]
       );
 
       res.json({ message: 'Tutor approved', temp_password: tempPassword });
@@ -679,11 +680,12 @@ router.post('/tutors/onboard',
       }
 
       // Create tutor profile (pending approval so it shows in existing queue)
+      const isFoundingPeriod = new Date() < new Date('2026-05-20T23:59:59');
       await pool.query(
         `INSERT INTO tutor_profiles
            (user_id, bio_ru, subjects, hourly_rate, trial_rate, city,
-            video_intro_url, is_approved, approval_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'pending')`,
+            video_intro_url, is_approved, approval_status, commission_locked_18pct)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'pending', $8)`,
         [
           user.id,
           bio_ru || '',
@@ -692,6 +694,7 @@ router.post('/tutors/onboard',
           parseFloat(trial_rate) || 200,
           city || 'Бишкек',
           videoIntroUrl,
+          isFoundingPeriod,
         ]
       );
 
