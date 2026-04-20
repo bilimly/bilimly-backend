@@ -253,6 +253,67 @@ router.post('/video-upload',
   }
 );
 
+
+// GET /api/tutors/:id/available-slots?date=YYYY-MM-DD
+// Returns list of slots available for booking on the given date:
+// = tutor's availability for that day_of_week MINUS already-booked slots on that date
+router.get('/:id/available-slots', async (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Укажите date=YYYY-MM-DD' });
+  }
+  try {
+    // Resolve tutor_profile_id (accepts users.id or tutor_profiles.id)
+    const tutor = await pool.query(
+      `SELECT tp.id AS tutor_profile_id
+         FROM tutor_profiles tp
+         JOIN users u ON u.id = tp.user_id
+        WHERE (u.id = $1 OR tp.id = $1)`,
+      [req.params.id]
+    );
+    if (!tutor.rows[0]) return res.status(404).json({ error: 'Репетитор не найден' });
+    const tutorProfileId = tutor.rows[0].tutor_profile_id;
+
+    // Compute day_of_week for the date (0=Sun..6=Sat) in Asia/Bishkek
+    // Postgres EXTRACT(dow FROM date) matches: Sunday=0, Saturday=6
+    const dowResult = await pool.query(
+      `SELECT EXTRACT(DOW FROM $1::date)::int AS dow`,
+      [date]
+    );
+    const dow = dowResult.rows[0].dow;
+
+    // Fetch availability for this day
+    const avail = await pool.query(
+      `SELECT start_time, end_time
+         FROM tutor_availability
+        WHERE tutor_id = $1 AND day_of_week = $2 AND is_active = TRUE
+        ORDER BY start_time`,
+      [tutorProfileId, dow]
+    );
+
+    // Fetch already-booked start_times on this exact date (not cancelled)
+    const booked = await pool.query(
+      `SELECT start_time
+         FROM bookings
+        WHERE tutor_id = $1
+          AND lesson_date = $2::date
+          AND status NOT IN ('cancelled')`,
+      [tutorProfileId, date]
+    );
+    const bookedTimes = new Set(booked.rows.map(r => r.start_time.substring(0, 5)));
+
+    // Filter out booked slots
+    const slots = avail.rows
+      .map(r => r.start_time.substring(0, 5))  // 'HH:MM'
+      .filter(t => !bookedTimes.has(t));
+
+    res.json({ date, day_of_week: dow, slots, booked: [...bookedTimes] });
+  } catch (err) {
+    console.error('[TUTORS/AVAILABLE-SLOTS] error:', err);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 module.exports = router;
 
 router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
