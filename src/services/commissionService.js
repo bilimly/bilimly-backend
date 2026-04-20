@@ -50,17 +50,23 @@ function tierForHours(totalPaidHours) {
  * @param {number} totalPaidHours — tutor's cumulative paid hours on Bilimly
  * @returns {{ gross_amount, commission_percent, commission_amount, net_amount, tier_hours_at_time }}
  */
-function computeSplit(grossAmount, totalPaidHours) {
+function computeSplit(grossAmount, totalPaidHours, locked18pct = false) {
   const gross = parseFloat(grossAmount) || 0;
-  const tier = tierForHours(totalPaidHours);
-  const commissionAmount = Math.round(gross * tier.commission_percent) / 100;
+  const tierHours = parseFloat(totalPaidHours) || 0;
+  let commissionPercent;
+  if (locked18pct) {
+    commissionPercent = 18;
+  } else {
+    commissionPercent = tierForHours(tierHours).commission_percent;
+  }
+  const commissionAmount = Math.round(gross * commissionPercent) / 100;
   const netAmount = Math.round((gross - commissionAmount) * 100) / 100;
   return {
     gross_amount: gross,
-    commission_percent: tier.commission_percent,
+    commission_percent: commissionPercent,
     commission_amount: commissionAmount,
     net_amount: netAmount,
-    tier_hours_at_time: parseFloat(totalPaidHours) || 0,
+    tier_hours_at_time: tierHours,
   };
 }
 
@@ -85,14 +91,16 @@ async function recordLessonEarnings(pool, booking) {
   );
   if (existing.rows[0]) return existing.rows[0];
 
-  // Read tutor's current paid hours for tier calculation
+  // Read tutor's current paid hours AND founding flag
   const tutor = await pool.query(
-    `SELECT total_paid_hours FROM tutor_profiles WHERE id = $1`,
+    `SELECT total_paid_hours, COALESCE(commission_locked_18pct, FALSE) AS locked18pct
+       FROM tutor_profiles WHERE id = $1`,
     [booking.tutor_id]
   );
   const currentHours = tutor.rows[0]?.total_paid_hours || 0;
+  const locked18pct = tutor.rows[0]?.locked18pct === true;
 
-  const split = computeSplit(booking.amount, currentHours);
+  const split = computeSplit(booking.amount, currentHours, locked18pct);
 
   const insert = await pool.query(
     `INSERT INTO tutor_earnings
