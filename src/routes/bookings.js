@@ -162,6 +162,7 @@ router.get('/my', auth, async (req, res) => {
               u_student.first_name as student_first_name,
               u_student.last_name as student_last_name,
               u_student.avatar_url as student_avatar,
+              u_tutor.id as tutor_user_id,
               u_tutor.first_name as tutor_first_name,
               u_tutor.last_name as tutor_last_name,
               u_tutor.avatar_url as tutor_avatar,
