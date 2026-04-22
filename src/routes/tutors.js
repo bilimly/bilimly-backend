@@ -31,8 +31,11 @@ router.get('/', async (req, res) => {
        FROM users u
        JOIN tutor_profiles tp ON u.id = tp.user_id
        WHERE tp.is_approved = true AND u.is_active = true
-       ORDER BY tp.is_featured DESC NULLS LAST, tp.rating DESC NULLS LAST
-       LIMIT 50`
+       ORDER BY tp.is_featured DESC NULLS LAST,
+                (CASE WHEN u.avatar_url IS NOT NULL AND tp.video_intro_url IS NOT NULL THEN 1 ELSE 0 END) DESC,
+                tp.rating DESC NULLS LAST,
+                u.created_at DESC
+       LIMIT 200`
     );
     res.json({ tutors: result.rows, total: result.rows.length });
   } catch (err) {
