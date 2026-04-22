@@ -12,22 +12,28 @@ const createLessonRoom = async (bookingId, durationMinutes = 60) => {
   try {
     // If Daily.co API key configured — use real rooms
     if (process.env.DAILY_API_KEY) {
+      console.log('[VIDEO] Creating Daily.co room for booking', bookingId);
       const exp = Math.floor(Date.now() / 1000) + (durationMinutes + 30) * 60;
+      const roomProps = {
+        exp,
+        max_participants: 2,
+        enable_chat: true,
+        enable_screenshare: true,
+        start_video_off: false,
+        start_audio_off: false,
+        lang: 'ru',
+      };
+      // Only enable recording if explicitly requested (requires paid plan)
+      if (process.env.DAILY_ENABLE_RECORDING === 'true') {
+        roomProps.enable_recording = 'cloud';
+        if (process.env.DAILY_S3_BUCKET) roomProps.recordings_bucket = process.env.DAILY_S3_BUCKET;
+      }
       const response = await axios.post(`${DAILY_API}/rooms`, {
         name: `bilimly-lesson-${bookingId}`,
         privacy: 'private',
-        properties: {
-          exp,
-          max_participants: 2,
-          enable_recording: 'cloud',
-          enable_chat: true,
-          enable_screenshare: true,
-          start_video_off: false,
-          start_audio_off: false,
-          lang: 'ru',
-          recordings_bucket: process.env.DAILY_S3_BUCKET || null,
-        }
+        properties: roomProps,
       }, { headers: DAILY_HEADERS });
+      console.log('[VIDEO] Daily.co room created:', response.data.url);
 
       const roomUrl = response.data.url;
 
@@ -75,7 +81,10 @@ const createLessonRoom = async (bookingId, durationMinutes = 60) => {
     };
 
   } catch (err) {
-    console.error('Video room error:', err.message);
+    console.error('[VIDEO] Room creation error for booking', bookingId, ':', err.message);
+    if (err.response) {
+      console.error('[VIDEO] Daily.co API response:', err.response.status, JSON.stringify(err.response.data));
+    }
     // Fallback to Jitsi
     const meetingUrl = `https://meet.jit.si/bilimly-${bookingId}`;
     await pool.query(
