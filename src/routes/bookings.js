@@ -239,6 +239,27 @@ router.put('/:id/confirm', auth, requireRole('tutor'), async (req, res) => {
 router.post('/:id/complete', auth, async (req, res) => {
   const { rating, comment } = req.body;
   try {
+    // Guard: only allow completion after the scheduled lesson start
+    const check = await pool.query(
+      `SELECT id, status, lesson_date, start_time
+         FROM bookings WHERE id=$1`,
+      [req.params.id]
+    );
+    if (!check.rows[0]) return res.status(404).json({ error: 'Booking not found' });
+    const cb = check.rows[0];
+    if (cb.status === 'completed') {
+      return res.json({ message: 'Already completed' });  // idempotent
+    }
+    if (cb.status === 'cancelled') {
+      return res.status(400).json({ error: 'Cannot complete a cancelled booking' });
+    }
+    const scheduledStart = new Date(
+      cb.lesson_date.toISOString().substring(0,10) + 'T' + cb.start_time
+    );
+    if (scheduledStart > new Date()) {
+      return res.status(400).json({ error: 'Нельзя завершить урок до его начала' });
+    }
+
     await pool.query(
       'UPDATE bookings SET status=$1, updated_at=NOW() WHERE id=$2',
       ['completed', req.params.id]
