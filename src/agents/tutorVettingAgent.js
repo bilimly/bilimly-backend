@@ -12,7 +12,7 @@ const reviewTutorApplication = async (applicationId) => {
     const app = result.rows[0];
     if (!app) return;
 
-    const prompt = `Ты — менеджер по найму репетиторов на платформе Bilimly.kg (Кыргызстан).
+    const prompt = `Ты — менеджер по найму репетиторов на платформе Bilimpark.kg (Кыргызстан).
     
 Проанализируй заявку репетитора и дай оценку от 0 до 100.
 

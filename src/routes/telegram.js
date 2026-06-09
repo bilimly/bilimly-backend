@@ -26,20 +26,20 @@ router.post('/webhook', async (req, res) => {
           [chatId.toString(), email]
         );
         await sendMessage(chatId,
-          `✅ <b>Аккаунт подключён!</b>\n\nЗдравствуйте, ${user.rows[0].first_name}!\n\nТеперь вы будете получать уведомления об уроках в Telegram.\n\n🎓 <a href="https://bilimly.kg">Bilimly.kg</a>`
+          `✅ <b>Аккаунт подключён!</b>\n\nЗдравствуйте, ${user.rows[0].first_name}!\n\nТеперь вы будете получать уведомления об уроках в Telegram.\n\n🎓 <a href="https://bilimpark.kg">Bilimpark.kg</a>`
         );
       } else {
         await sendMessage(chatId,
-          `❌ Email не найден. Убедитесь что вы зарегистрированы на <a href="https://bilimly.kg">bilimly.kg</a>`
+          `❌ Email не найден. Убедитесь что вы зарегистрированы на <a href="https://bilimpark.kg">bilimpark.kg</a>`
         );
       }
     } else if (text === '/start') {
       await sendMessage(chatId,
-        `👋 <b>Добро пожаловать в Bilimly.kg!</b>\n\nЯ буду отправлять вам уведомления об уроках.\n\n📧 Чтобы подключить аккаунт, отправьте ваш email с Bilimly.kg\n\nНапример: <code>your@email.com</code>`
+        `👋 <b>Добро пожаловать в Bilimpark.kg!</b>\n\nЯ буду отправлять вам уведомления об уроках.\n\n📧 Чтобы подключить аккаунт, отправьте ваш email с Bilimpark.kg\n\nНапример: <code>your@email.com</code>`
       );
     } else {
       await sendMessage(chatId,
-        `📧 Отправьте ваш email с Bilimly.kg чтобы подключить аккаунт.\n\nНапример: <code>your@email.com</code>`
+        `📧 Отправьте ваш email с Bilimpark.kg чтобы подключить аккаунт.\n\nНапример: <code>your@email.com</code>`
       );
     }
     res.json({ ok: true });
@@ -52,7 +52,7 @@ router.post('/webhook', async (req, res) => {
 // Get connection link for user
 router.get('/connect-link', (req, res) => {
   res.json({ 
-    url: `https://t.me/BilimlyKGBot`,
+    url: `https://t.me/BilimparkKGBot`,
     instructions: 'Откройте бот и отправьте ваш email'
   });
 });

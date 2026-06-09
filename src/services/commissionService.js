@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Bilimly commission engine
+// Bilimpark commission engine
 // Sliding tier based on tutor's cumulative paid hours on platform
 // ═══════════════════════════════════════════════════════════
 
@@ -47,7 +47,7 @@ function tierForHours(totalPaidHours) {
  * Given a gross lesson amount and tutor's current paid hours,
  * compute the commission split.
  * @param {number} grossAmount — what the student paid
- * @param {number} totalPaidHours — tutor's cumulative paid hours on Bilimly
+ * @param {number} totalPaidHours — tutor's cumulative paid hours on Bilimpark
  * @returns {{ gross_amount, commission_percent, commission_amount, net_amount, tier_hours_at_time }}
  */
 function computeSplit(grossAmount, totalPaidHours, locked18pct = false) {

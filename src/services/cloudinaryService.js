@@ -11,11 +11,11 @@ cloudinary.config({
 /**
  * Upload a video file buffer to Cloudinary.
  * @param {Buffer} buffer - Video file buffer from multer
- * @param {string} folder - Cloudinary folder (e.g., 'bilimly/tutor-videos')
+ * @param {string} folder - Cloudinary folder (e.g., 'bilimpark/tutor-videos')
  * @param {string} publicId - Optional custom public ID
  * @returns {Promise<{ url: string, public_id: string, duration: number }>}
  */
-function uploadVideo(buffer, folder = 'bilimly/tutor-videos', publicId = null) {
+function uploadVideo(buffer, folder = 'bilimpark/tutor-videos', publicId = null) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {

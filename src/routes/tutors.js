@@ -164,7 +164,7 @@ router.post('/avatar',
         const stream = cloudinary.uploader.upload_stream(
           {
             resource_type: 'image',
-            folder: 'bilimly/avatars',
+            folder: 'bilimpark/avatars',
             public_id: `user_${req.user.id}`,
             overwrite: true,
             invalidate: true,
@@ -231,7 +231,7 @@ router.post('/video-upload',
         const stream = cloudinary.uploader.upload_stream(
           {
             resource_type: 'video',
-            folder: 'bilimly/tutor-videos',
+            folder: 'bilimpark/tutor-videos',
             public_id: `tutor_${req.user.id}`,
             overwrite: true,
             chunk_size: 6000000,

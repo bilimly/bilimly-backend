@@ -61,7 +61,7 @@ router.get('/overview', auth, requireRole('tutor'), async (req, res) => {
       `, [tutorId]),
     ]);
 
-    // Platform commission (Bilimly takes 15%)
+    // Platform commission (Bilimpark takes 15%)
     const COMMISSION = 0.15;
     const totalGross = parseFloat(total.rows[0].total);
     const monthGross = parseFloat(thisMonth.rows[0].total);
@@ -126,7 +126,7 @@ router.post('/payout', auth, requireRole('tutor'), async (req, res) => {
       `INSERT INTO notifications
          (user_id, type, title_ru, message_ru)
        VALUES
-         ((SELECT id FROM users WHERE email='admin@bilimly.kg'),
+         ((SELECT id FROM users WHERE email='admin@bilimpark.kg'),
           'payout_request',
           'Запрос на выплату',
           $1)`,

@@ -6,7 +6,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const migrate = async () => {
   const client = await pool.connect();
   try {
-    console.log('🚀 Running Bilimly database migrations...');
+    console.log('🚀 Running Bilimpark database migrations...');
     await client.query('BEGIN');
 
     // ── USERS ──────────────────────────────────────────────

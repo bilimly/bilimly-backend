@@ -13,7 +13,7 @@ const generateMbankQR = async (paymentId, amount) => {
           amount: amount,
           currency: 'KGS',
           order_id: paymentId,
-          description: `Bilimly - Оплата урока`,
+          description: `Bilimpark - Оплата урока`,
           callback_url: `${process.env.BACKEND_URL}/api/payments/mbank/webhook`,
           success_url: `${process.env.FRONTEND_URL}/booking/success?payment_id=${paymentId}`,
           fail_url: `${process.env.FRONTEND_URL}/booking/failed?payment_id=${paymentId}`,
@@ -35,8 +35,8 @@ const generateMbankQR = async (paymentId, amount) => {
     // DEMO MODE - returns a placeholder QR for testing
     // Replace with real Mbank credentials when available
     return {
-      qr_code: `BILIMLY_QR_${paymentId}_${amount}KGS`,
-      qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BILIMLY_PAY_${paymentId}_${amount}`,
+      qr_code: `BILIMPARK_QR_${paymentId}_${amount}KGS`,
+      qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BILIMPARK_PAY_${paymentId}_${amount}`,
       transaction_id: `DEMO_${paymentId}`,
     };
 
@@ -44,8 +44,8 @@ const generateMbankQR = async (paymentId, amount) => {
     console.error('Mbank QR generation error:', err.message);
     // Fallback to demo QR
     return {
-      qr_code: `BILIMLY_QR_${paymentId}`,
-      qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BILIMLY_${paymentId}_${amount}KGS`,
+      qr_code: `BILIMPARK_QR_${paymentId}`,
+      qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BILIMPARK_${paymentId}_${amount}KGS`,
       transaction_id: null,
     };
   }

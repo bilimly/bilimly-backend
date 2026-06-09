@@ -29,7 +29,7 @@ const createLessonRoom = async (bookingId, durationMinutes = 60) => {
         if (process.env.DAILY_S3_BUCKET) roomProps.recordings_bucket = process.env.DAILY_S3_BUCKET;
       }
       const response = await axios.post(`${DAILY_API}/rooms`, {
-        name: `bilimly-lesson-${bookingId}`,
+        name: `bilimpark-lesson-${bookingId}`,
         privacy: 'private',
         properties: roomProps,
       }, { headers: DAILY_HEADERS });
@@ -65,7 +65,7 @@ const createLessonRoom = async (bookingId, durationMinutes = 60) => {
     }
 
     // DEMO MODE — use free Jitsi Meet (no account needed)
-    const roomName = `bilimly-${bookingId}-${Date.now()}`;
+    const roomName = `bilimpark-${bookingId}-${Date.now()}`;
     const meetingUrl = `https://meet.jit.si/${roomName}`;
 
     await pool.query(
@@ -86,7 +86,7 @@ const createLessonRoom = async (bookingId, durationMinutes = 60) => {
       console.error('[VIDEO] Daily.co API response:', err.response.status, JSON.stringify(err.response.data));
     }
     // Fallback to Jitsi
-    const meetingUrl = `https://meet.jit.si/bilimly-${bookingId}`;
+    const meetingUrl = `https://meet.jit.si/bilimpark-${bookingId}`;
     await pool.query(
       'UPDATE bookings SET meeting_url = $1 WHERE id = $2',
       [meetingUrl, bookingId]
@@ -121,7 +121,7 @@ const getLessonRecording = async (bookingId) => {
     );
     if (!booking.rows[0]?.meeting_url || !process.env.DAILY_API_KEY) return null;
 
-    const roomName = `bilimly-lesson-${bookingId}`;
+    const roomName = `bilimpark-lesson-${bookingId}`;
     const response = await axios.get(
       `${DAILY_API}/recordings?room_name=${roomName}`,
       { headers: DAILY_HEADERS }

@@ -240,17 +240,17 @@ router.put('/tutors/:userId/approve', async (req, res) => {
       const { Resend } = require('resend');
       const resend = new Resend(process.env.RESEND_API_KEY);
       resend.emails.send({
-        from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+        from: `Bilimpark.kg <${process.env.FROM_EMAIL}>`,
         to: tutor.rows[0].email,
-        subject: '🎉 Ваш профиль одобрен на Bilimly.kg!',
+        subject: '🎉 Ваш профиль одобрен на Bilimpark.kg!',
         html: `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
             <div style="background:#0ABAB5;padding:24px;text-align:center;">
-              <h1 style="color:white;font-size:1.5rem;margin:0">Bilimly.kg</h1>
+              <h1 style="color:white;font-size:1.5rem;margin:0">Bilimpark.kg</h1>
             </div>
             <div style="padding:32px;background:#f9fafb;">
               <h2 style="color:#0a0a0a">Поздравляем, ${tutor.rows[0].first_name}! 🎉</h2>
-              <p style="font-size:1rem;color:#374151">Ваш профиль репетитора был одобрен. Теперь вы видны на bilimly.kg и студенты могут записываться к вам.</p>
+              <p style="font-size:1rem;color:#374151">Ваш профиль репетитора был одобрен. Теперь вы видны на bilimpark.kg и студенты могут записываться к вам.</p>
               <div style="background:white;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #e5e7eb;">
                 <p><strong>Что делать дальше:</strong></p>
                 <p>✅ Войдите в кабинет репетитора</p>
@@ -258,10 +258,10 @@ router.put('/tutors/:userId/approve', async (req, res) => {
                 <p>✅ Добавьте видео-презентацию если ещё не добавили</p>
                 <p>✅ Установите своё расписание</p>
               </div>
-              <a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;font-size:1rem;">Открыть кабинет репетитора →</a>
+              <a href="https://bilimpark.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;font-size:1rem;">Открыть кабинет репетитора →</a>
             </div>
             <div style="padding:16px;text-align:center;color:#6b7280;font-size:0.8rem;">
-              © 2026 Bilimly.kg · Бишкек, Кыргызстан
+              © 2026 Bilimpark.kg · Бишкек, Кыргызстан
             </div>
           </div>
         `
@@ -362,20 +362,20 @@ router.put('/bookings/:id/confirm', async (req, res) => {
       // Email to student
       if (b.student_email) {
         resend.emails.send({
-          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          from: `Bilimpark.kg <${process.env.FROM_EMAIL}>`,
           to: b.student_email,
           subject: '✅ Оплата подтверждена — урок забронирован',
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimly.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Оплата подтверждена! 🎉</h2><p>Здравствуйте, <strong>${b.student_first}</strong>! Ваша оплата получена.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👨‍🏫 Репетитор:</strong> ${tutorFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}</div></div>`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimpark.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Оплата подтверждена! 🎉</h2><p>Здравствуйте, <strong>${b.student_first}</strong>! Ваша оплата получена.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👨‍🏫 Репетитор:</strong> ${tutorFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}</div></div>`,
         }).catch((e) => console.error('[ADMIN/CONFIRM] student email failed:', e));
       }
 
       // Email to tutor
       if (b.tutor_email) {
         resend.emails.send({
-          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          from: `Bilimpark.kg <${process.env.FROM_EMAIL}>`,
           to: b.tutor_email,
           subject: '✅ Урок подтверждён — оплата получена',
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimly.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Урок подтверждён! 🎉</h2><p>Здравствуйте, <strong>${b.tutor_first}</strong>! Студент оплатил урок.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👤 Студент:</strong> ${studentFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}<p style="font-size:0.85rem;color:#666;margin-top:16px">Не забудьте подключиться за 5 минут до начала.</p></div></div>`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0;font-size:1.4rem">Bilimpark.kg</h1></div><div style="padding:28px;background:#f9fafb"><h2 style="color:#0a0a0a">Урок подтверждён! 🎉</h2><p>Здравствуйте, <strong>${b.tutor_first}</strong>! Студент оплатил урок.</p><div style="background:white;border-radius:10px;padding:18px;margin:16px 0;border:1px solid #e5e7eb"><p><strong>👤 Студент:</strong> ${studentFullName}</p><p><strong>📚 Предмет:</strong> ${b.subject || 'Урок'}</p><p><strong>📅 Дата:</strong> ${dateStr}</p><p><strong>🕐 Время:</strong> ${b.start_time}</p><p><strong>💰 Сумма:</strong> ${b.amount} сом</p></div>${videoBlock}<p style="font-size:0.85rem;color:#666;margin-top:16px">Не забудьте подключиться за 5 минут до начала.</p></div></div>`,
         }).catch((e) => console.error('[ADMIN/CONFIRM] tutor email failed:', e));
       }
     } catch (e) { console.error('[ADMIN/CONFIRM] email block failed:', e); }
@@ -629,7 +629,7 @@ router.post('/tutors/onboard',
     let finalEmail = (email || '').trim().toLowerCase();
     if (!finalEmail) {
       const cleanPhone = String(phone).replace(/[^0-9]/g, '');
-      finalEmail = `tutor_${cleanPhone}@bilimly.kg`;
+      finalEmail = `tutor_${cleanPhone}@bilimpark.kg`;
     }
 
     try {
@@ -665,7 +665,7 @@ router.post('/tutors/onboard',
           const { uploadVideo } = require('../services/cloudinaryService');
           const result = await uploadVideo(
             req.file.buffer,
-            'bilimly/tutor-videos',
+            'bilimpark/tutor-videos',
             `tutor_${user.id}`
           );
           videoIntroUrl = result.url;
@@ -699,10 +699,10 @@ router.post('/tutors/onboard',
       );
 
       // Build the magic link (frontend will handle it)
-      const claimLink = `https://www.bilimly.kg/tutor-claim.html?token=${claimToken}`;
+      const claimLink = `https://www.bilimpark.kg/tutor-claim.html?token=${claimToken}`;
 
       // Pre-filled WhatsApp message the admin copy-pastes
-      const whatsappMessage = `Привет, ${first_name}! 👋\n\nТвой профиль создан на Bilimly.kg. Нажми эту ссылку чтобы установить пароль и активировать аккаунт:\n\n${claimLink}\n\nССылка действует 7 дней. После активации ты сможешь получать студентов.`;
+      const whatsappMessage = `Привет, ${first_name}! 👋\n\nТвой профиль создан на Bilimpark.kg. Нажми эту ссылку чтобы установить пароль и активировать аккаунт:\n\n${claimLink}\n\nССылка действует 7 дней. После активации ты сможешь получать студентов.`;
 
       // Admin Telegram notification
       try {

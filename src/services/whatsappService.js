@@ -46,9 +46,9 @@ const sendBookingConfirmation = async (bookingId) => {
     if (!b?.phone) return;
 
     const messages = {
-      ru: `✅ *Bilimly.kg* — Урок подтверждён!\n\n👤 Репетитор: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Дата: ${new Date(b.lesson_date).toLocaleDateString('ru-RU')}\n⏰ Время: ${b.start_time}\n📚 Предмет: ${b.subject}\n\nСсылка на урок будет отправлена за 30 минут до начала.\n\nЕсть вопросы? Пишите сюда 💬`,
-      ky: `✅ *Bilimly.kg* — Сабак тастыкталды!\n\n👤 Мугалим: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Күнү: ${new Date(b.lesson_date).toLocaleDateString('ru-RU')}\n⏰ Убактысы: ${b.start_time}\n📚 Сабак: ${b.subject}\n\nУрокка шилтеме 30 мүнөт мурун жиберилет.\n\nСуроолоруңуз барбы? Бул жерге жазыңыз 💬`,
-      en: `✅ *Bilimly.kg* — Lesson Confirmed!\n\n👤 Tutor: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Date: ${new Date(b.lesson_date).toLocaleDateString()}\n⏰ Time: ${b.start_time}\n📚 Subject: ${b.subject}\n\nLesson link will be sent 30 minutes before start.\n\nAny questions? Write here 💬`
+      ru: `✅ *Bilimpark.kg* — Урок подтверждён!\n\n👤 Репетитор: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Дата: ${new Date(b.lesson_date).toLocaleDateString('ru-RU')}\n⏰ Время: ${b.start_time}\n📚 Предмет: ${b.subject}\n\nСсылка на урок будет отправлена за 30 минут до начала.\n\nЕсть вопросы? Пишите сюда 💬`,
+      ky: `✅ *Bilimpark.kg* — Сабак тастыкталды!\n\n👤 Мугалим: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Күнү: ${new Date(b.lesson_date).toLocaleDateString('ru-RU')}\n⏰ Убактысы: ${b.start_time}\n📚 Сабак: ${b.subject}\n\nУрокка шилтеме 30 мүнөт мурун жиберилет.\n\nСуроолоруңуз барбы? Бул жерге жазыңыз 💬`,
+      en: `✅ *Bilimpark.kg* — Lesson Confirmed!\n\n👤 Tutor: ${b.tutor_first_name} ${b.tutor_last_name}\n📅 Date: ${new Date(b.lesson_date).toLocaleDateString()}\n⏰ Time: ${b.start_time}\n📚 Subject: ${b.subject}\n\nLesson link will be sent 30 minutes before start.\n\nAny questions? Write here 💬`
     };
 
     const lang = b.language_preference || 'ru';
@@ -75,9 +75,9 @@ const sendLessonReminder = async (bookingId) => {
     if (!b?.phone || !b.meeting_url) return;
 
     const messages = {
-      ru: `⏰ *Bilimly.kg* — Ваш урок через 30 минут!\n\n👤 Репетитор: ${b.tutor_first_name}\n🔗 Войти в урок: ${b.meeting_url}\n\nУдачи! 🌟`,
-      ky: `⏰ *Bilimly.kg* — Сабагыңыз 30 мүнөттөн кийин!\n\n👤 Мугалим: ${b.tutor_first_name}\n🔗 Сабакка кирүү: ${b.meeting_url}\n\nЖакшы окуу! 🌟`,
-      en: `⏰ *Bilimly.kg* — Your lesson in 30 minutes!\n\n👤 Tutor: ${b.tutor_first_name}\n🔗 Join lesson: ${b.meeting_url}\n\nGood luck! 🌟`
+      ru: `⏰ *Bilimpark.kg* — Ваш урок через 30 минут!\n\n👤 Репетитор: ${b.tutor_first_name}\n🔗 Войти в урок: ${b.meeting_url}\n\nУдачи! 🌟`,
+      ky: `⏰ *Bilimpark.kg* — Сабагыңыз 30 мүнөттөн кийин!\n\n👤 Мугалим: ${b.tutor_first_name}\n🔗 Сабакка кирүү: ${b.meeting_url}\n\nЖакшы окуу! 🌟`,
+      en: `⏰ *Bilimpark.kg* — Your lesson in 30 minutes!\n\n👤 Tutor: ${b.tutor_first_name}\n🔗 Join lesson: ${b.meeting_url}\n\nGood luck! 🌟`
     };
 
     await sendMessage(b.phone, messages[b.language_preference || 'ru']);

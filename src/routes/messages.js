@@ -191,9 +191,9 @@ const notifyRecipient = async (recipientId, sender, content) => {
     if (!user?.phone) return;
 
     const messages = {
-      ru: `💬 *Bilimly* — Новое сообщение!\n\nОт: ${sender.first_name}\n"${content?.substring(0,100)}"\n\nОткрой bilimly.kg чтобы ответить`,
-      ky: `💬 *Bilimly* — Жаңы кат!\n\nКимден: ${sender.first_name}\n"${content?.substring(0,100)}"`,
-      en: `💬 *Bilimly* — New message!\n\nFrom: ${sender.first_name}\n"${content?.substring(0,100)}"`,
+      ru: `💬 *Bilimpark* — Новое сообщение!\n\nОт: ${sender.first_name}\n"${content?.substring(0,100)}"\n\nОткрой bilimpark.kg чтобы ответить`,
+      ky: `💬 *Bilimpark* — Жаңы кат!\n\nКимден: ${sender.first_name}\n"${content?.substring(0,100)}"`,
+      en: `💬 *Bilimpark* — New message!\n\nFrom: ${sender.first_name}\n"${content?.substring(0,100)}"`,
     };
 
     const { sendMessage } = require('./whatsappService');

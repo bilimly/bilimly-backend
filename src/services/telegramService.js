@@ -39,20 +39,20 @@ const sendMessage = async (chatId, message) => {
 
 const sendLessonReminder = async (chatId, name, tutorName, subject, time, isStudent) => {
   const message = isStudent
-    ? `⏰ <b>Напоминание об уроке!</b>\n\nЗдравствуйте, ${name}!\n\nВаш урок по <b>${subject}</b> с репетитором <b>${tutorName}</b> начинается через 1 час.\n\n🕐 Время: ${time}\n\n👉 <a href="https://bilimly.kg/dashboard.html">Открыть кабинет</a>`
-    : `⏰ <b>Напоминание об уроке!</b>\n\nЗдравствуйте, ${name}!\n\nВаш урок со студентом <b>${tutorName}</b> по <b>${subject}</b> начинается через 1 час.\n\n🕐 Время: ${time}\n\n👉 <a href="https://bilimly.kg/tutor-dashboard.html">Открыть кабинет</a>`;
+    ? `⏰ <b>Напоминание об уроке!</b>\n\nЗдравствуйте, ${name}!\n\nВаш урок по <b>${subject}</b> с репетитором <b>${tutorName}</b> начинается через 1 час.\n\n🕐 Время: ${time}\n\n👉 <a href="https://bilimpark.kg/dashboard.html">Открыть кабинет</a>`
+    : `⏰ <b>Напоминание об уроке!</b>\n\nЗдравствуйте, ${name}!\n\nВаш урок со студентом <b>${tutorName}</b> по <b>${subject}</b> начинается через 1 час.\n\n🕐 Время: ${time}\n\n👉 <a href="https://bilimpark.kg/tutor-dashboard.html">Открыть кабинет</a>`;
   return sendMessage(chatId, message);
 };
 
 const sendBookingNotification = async (chatId, name, subject, studentName, date, time, isTutor) => {
   const message = isTutor
-    ? `📅 <b>Новое бронирование!</b>\n\nСтудент <b>${studentName}</b> записался на урок по <b>${subject}</b>.\n\n📆 Дата: ${date}\n🕐 Время: ${time}\n\n👉 <a href="https://bilimly.kg/tutor-dashboard.html">Подтвердить урок</a>`
-    : `✅ <b>Урок забронирован!</b>\n\nВы записались на урок по <b>${subject}</b>.\n\n📆 Дата: ${date}\n🕐 Время: ${time}\n\n👉 <a href="https://bilimly.kg/dashboard.html">Открыть кабинет</a>`;
+    ? `📅 <b>Новое бронирование!</b>\n\nСтудент <b>${studentName}</b> записался на урок по <b>${subject}</b>.\n\n📆 Дата: ${date}\n🕐 Время: ${time}\n\n👉 <a href="https://bilimpark.kg/tutor-dashboard.html">Подтвердить урок</a>`
+    : `✅ <b>Урок забронирован!</b>\n\nВы записались на урок по <b>${subject}</b>.\n\n📆 Дата: ${date}\n🕐 Время: ${time}\n\n👉 <a href="https://bilimpark.kg/dashboard.html">Открыть кабинет</a>`;
   return sendMessage(chatId, message);
 };
 
 const sendApprovalNotification = async (chatId, firstName) => {
-  const message = `🎉 <b>Поздравляем, ${firstName}!</b>\n\nВаш профиль репетитора одобрен на Bilimly.kg!\n\nТеперь студенты могут записываться к вам.\n\n👉 <a href="https://bilimly.kg/tutor-dashboard.html">Открыть кабинет репетитора</a>`;
+  const message = `🎉 <b>Поздравляем, ${firstName}!</b>\n\nВаш профиль репетитора одобрен на Bilimpark.kg!\n\nТеперь студенты могут записываться к вам.\n\n👉 <a href="https://bilimpark.kg/tutor-dashboard.html">Открыть кабинет репетитора</a>`;
   return sendMessage(chatId, message);
 };
 
@@ -91,7 +91,7 @@ const notifyAdminNewLead = async (lead, matchedTutors = []) => {
     `🎓 ${escapeHtml(grade)}\n` +
     `${urgency}\n\n` +
     `<b>Подобраны:</b>\n${tutorsLine}\n\n` +
-    `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+    `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
   return sendMessage(ADMIN_CHAT_ID, msg);
 };
 
@@ -118,7 +118,7 @@ const notifyAdminNewTutorApplication = async (app) => {
     `Предметы: ${escapeHtml(subjectsStr)}\n` +
     `Опыт: ${app.experience_years || 0} лет\n` +
     `Ставка: ${app.hourly_rate || '—'} сом/ч\n\n` +
-    `<a href="https://bilimly.kg/admin.html">Проверить →</a>`;
+    `<a href="https://bilimpark.kg/admin.html">Проверить →</a>`;
   return sendMessage(ADMIN_CHAT_ID, msg);
 };
 
@@ -152,7 +152,7 @@ const notifyAdminError = async (route, error) => {
 const sendAdminDailySummary = async (stats) => {
   if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
   const msg =
-    `📊 <b>Bilimly — итоги дня</b>\n` +
+    `📊 <b>Bilimpark — итоги дня</b>\n` +
     `${stats.date}\n\n` +
     `<b>Лиды:</b> ${stats.leads_today}\n` +
     `  ⚡ На этой неделе: ${stats.leads_this_week}\n` +
@@ -164,7 +164,7 @@ const sendAdminDailySummary = async (stats) => {
     `<b>Требует внимания:</b>\n` +
     `  ⏳ Не связались с лидами: ${stats.uncontacted_leads}\n` +
     `  📝 Ждут проверки (репетиторы): ${stats.pending_tutor_apps}\n\n` +
-    `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+    `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
   return sendMessage(ADMIN_CHAT_ID, msg);
 };
 

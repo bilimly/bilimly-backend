@@ -78,7 +78,7 @@ const handleComment = async (commentData) => {
 
     // Generate a relevant reply to comment
     const { handleChatMessage } = require('../agents/supportAgent');
-    const context = `Пользователь оставил комментарий под постом Bilimly в Instagram: "${text}". Дай краткий дружелюбный ответ на комментарий (1-2 предложения), побуди написать в директ для подробностей.`;
+    const context = `Пользователь оставил комментарий под постом Bilimpark в Instagram: "${text}". Дай краткий дружелюбный ответ на комментарий (1-2 предложения), побуди написать в директ для подробностей.`;
     const reply = await handleChatMessage(context, null, 'instagram', []);
 
     // Reply to comment

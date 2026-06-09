@@ -88,10 +88,10 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
         const { Resend } = require('resend');
         const resend = new Resend(process.env.RESEND_API_KEY);
         resend.emails.send({
-          from: `Bilimly.kg <${process.env.FROM_EMAIL}>`,
+          from: `Bilimpark.kg <${process.env.FROM_EMAIL}>`,
           to: tutorUser.email,
-          subject: '📅 Новое бронирование на Bilimly.kg!',
-          html: `<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimly.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimly.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`,
+          subject: '📅 Новое бронирование на Bilimpark.kg!',
+          html: `<div style="font-family:Arial,sans-serif"><div style="background:#0ABAB5;padding:24px;text-align:center"><h1 style="color:white;margin:0">Bilimpark.kg</h1></div><div style="padding:32px"><h2>Новое бронирование! 🎉</h2><p>Студент записался к вам на урок.</p><a href="https://bilimpark.kg/tutor-dashboard.html" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;">Открыть кабинет →</a></div></div>`,
         }).catch((e) => console.error('[BOOKINGS] tutor email failed:', e));
       } catch (e) { /* swallow */ }
     }
@@ -413,7 +413,7 @@ router.post('/recurring', auth, async (req, res) => {
         const msg =
           `💰 <b>Новые повторяющиеся бронирования</b>\n\n` +
           `📚 Уроков: <b>${bookings.length}</b>\n` +
-          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+          `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
         sendMessage(adminChatId, msg).catch((e) => console.error('[BOOKINGS/RECURRING] Admin notify failed:', e));
       }
     } catch (e) { /* swallow */ }
@@ -463,7 +463,7 @@ router.post('/packages/buy', auth, async (req, res) => {
           `📚 Уроков: <b>${lessons}</b>\n` +
           `💵 Сумма: <b>${Math.round(totalAmount)} сом</b>\n` +
           `💰 Цена за урок: ${Math.round(pricePerLesson)} сом (скидка ${discount}%)\n` +
-          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+          `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
         sendMessage(adminChatId, msg).catch((e) => console.error('[PACKAGES] Admin notify failed:', e));
       }
     } catch (e) { /* swallow */ }
@@ -541,7 +541,7 @@ router.post('/:id/mark-paid', auth, async (req, res) => {
           `📅 ${dateStr} в ${b.start_time}\n` +
           `💰 ${b.amount} сом\n\n` +
           `Проверьте чек в WhatsApp и подтвердите:\n` +
-          `<a href="https://bilimly.kg/admin.html">Открыть админку →</a>`;
+          `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
         sendMessage(adminChatId, msg).catch((e) => console.error('[BOOKINGS/MARK-PAID] Telegram failed:', e));
       }
     } catch (e) { /* swallow */ }

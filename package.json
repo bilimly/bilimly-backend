@@ -1,7 +1,7 @@
 {
-  "name": "bilimly-backend",
+  "name": "bilimpark-backend",
   "version": "1.0.0",
-  "description": "Bilimly Tutor Marketplace - Backend API",
+  "description": "Bilimpark Tutor Marketplace - Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

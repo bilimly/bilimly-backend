@@ -12,8 +12,8 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL,
     'http://localhost:3000',
-    'https://bilimly.kg',
-    'https://www.bilimly.kg'
+    'https://bilimpark.kg',
+    'https://www.bilimpark.kg'
   ],
   credentials: true,
 }));
@@ -45,7 +45,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    name: 'Bilimly API',
+    name: 'Bilimpark API',
     version: '1.0.0',
     time: new Date().toISOString()
   });
@@ -67,7 +67,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`
   ╔══════════════════════════════════╗
-  ║   🎓 BILIMLY API RUNNING         ║
+  ║   🎓 BILIMPARK API RUNNING         ║
   ║   Port: ${PORT}                     ║
   ║   Env:  ${process.env.NODE_ENV || 'development'}               ║
   ╚══════════════════════════════════╝

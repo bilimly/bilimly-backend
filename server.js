@@ -69,4 +69,4 @@ try {
   console.error('[BOOT] Migration hook failed:', e);
 }
 
-app.listen(PORT, '0.0.0.0', () => console.log('BILIMLY RUNNING on port ' + PORT));
+app.listen(PORT, '0.0.0.0', () => console.log('BILIMPARK RUNNING on port ' + PORT));
