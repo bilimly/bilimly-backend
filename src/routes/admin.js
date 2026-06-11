@@ -3,6 +3,7 @@ const pool = require('../config/database');
 const { auth, requireRole } = require('../middleware/auth');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
+const { sendWelcomeEmail } = require('../services/emailService');
 const crypto = require('crypto');
 const router = express.Router();
 
