@@ -140,6 +140,7 @@ router.put('/applications/:id/review', async (req, res) => {
         [user.rows[0].id, about, hourly_rate || 500, subjects || [], isFoundingPeriod]
       );
 
+      await sendWelcomeEmail(email, first_name, 'tutor');
       res.json({ message: 'Tutor approved', temp_password: tempPassword });
     } else {
       res.json({ message: 'Application rejected' });
