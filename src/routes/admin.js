@@ -63,7 +63,7 @@ router.get('/users', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT u.id, u.email, u.role, u.first_name, u.last_name, u.phone, u.is_active, u.created_at, tp.is_approved as tutor_approved, tp.approval_status, tp.subjects, tp.hourly_rate, tp.rating, tp.total_lessons, tp.badge, tp.id as tutor_profile_id
+      `SELECT u.id, u.email, u.role, u.first_name, u.last_name, u.phone, u.is_active, u.created_at, tp.is_approved as tutor_approved, tp.approval_status, tp.subjects, tp.hourly_rate, tp.rating, tp.total_lessons, tp.badge, tp.id as tutor_profile_id, tp.is_visible
        FROM users u LEFT JOIN tutor_profiles tp ON u.id = tp.user_id ${where.replace('WHERE', 'WHERE u.')}
        ORDER BY created_at DESC
        LIMIT $${i} OFFSET $${i+1}`,
