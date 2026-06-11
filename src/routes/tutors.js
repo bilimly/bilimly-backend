@@ -194,7 +194,7 @@ router.post('/avatar',
       if (!result.rows || result.rows.length === 0) {
         return res.status(500).json({ error: 'User not found in DB' });
       }
-      return res.json({ success: true, avatar_url: result.rows[0].avatar_url });
+      return res.json({ success: true, avatar_url: result.rows[0].avatar_url + "?v=" + Date.now() });
     } catch (err) {
       console.error('[AVATAR] db error:', err);
       return res.status(500).json({ error: 'DB update failed: ' + err.message });
