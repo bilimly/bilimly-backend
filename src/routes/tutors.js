@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
               tp.is_featured, tp.video_intro_url, tp.city, tp.badge, tp.total_students, tp.response_rate, tp.repeat_student_rate
        FROM users u
        JOIN tutor_profiles tp ON u.id = tp.user_id
-       WHERE tp.is_approved = true AND u.is_active = true
+       WHERE tp.is_approved = true AND u.is_active = true AND COALESCE(tp.is_visible, true) = true
        ORDER BY tp.is_featured DESC NULLS LAST,
                 (CASE WHEN u.avatar_url IS NOT NULL AND tp.video_intro_url IS NOT NULL THEN 1 ELSE 0 END) DESC,
                 tp.rating DESC NULLS LAST,

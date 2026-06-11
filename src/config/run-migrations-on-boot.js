@@ -10,6 +10,10 @@ async function runBootMigrations() {
       ALTER TABLE tutor_profiles
         ADD COLUMN IF NOT EXISTS commission_locked_18pct BOOLEAN DEFAULT FALSE
     `);
+    await pool.query(`
+      ALTER TABLE tutor_profiles
+        ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT TRUE
+    `);
 
     // Backfill: everyone whose user was created before 2026-05-20 gets founding rate
     // Only updates rows where the flag is still at its default FALSE

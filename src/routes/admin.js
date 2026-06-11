@@ -757,4 +757,11 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+router.put('/tutors/:userId/toggle-visibility', async (req, res) => {
+  try {
+    const result = await pool.query(`UPDATE tutor_profiles SET is_visible = NOT COALESCE(is_visible, true) WHERE user_id=$1 RETURNING is_visible`, [req.params.userId]);
+    res.json({ is_visible: result.rows[0].is_visible });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;
