@@ -82,13 +82,13 @@ router.get('/me', auth, async (req, res) => {
 });
 
 router.put('/me', auth, async (req, res) => {
-  const { first_name, last_name, phone, language_preference, avatar_url } = req.body;
+  const { first_name, last_name, phone, language_preference } = req.body;
   try {
     const result = await pool.query(
       `UPDATE users SET first_name=$1, last_name=$2, phone=$3,
-       language_preference=$4, avatar_url=$5, updated_at=NOW()
-       WHERE id=$6 RETURNING id, email, role, first_name, last_name, phone, language_preference`,
-      [first_name, last_name, phone, language_preference, avatar_url, req.user.id]
+       language_preference=$4, updated_at=NOW()
+       WHERE id=$5 RETURNING id, email, role, first_name, last_name, phone, language_preference`,
+      [first_name, last_name, phone, language_preference, req.user.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
