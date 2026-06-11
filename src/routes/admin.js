@@ -226,7 +226,6 @@ router.get('/messages', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
-module.exports = router;
 
 router.put('/tutors/:userId/approve', async (req, res) => {
   try {
