@@ -799,7 +799,9 @@ router.post('/managers', async (req, res) => {
     );
     const defaultPermissions = permissions || { view_dashboard:true, view_leads:true, edit_leads:true, view_all_leads:true, view_tutors:true, approve_tutors:true, edit_tutors:true, view_students:true, view_bookings:true, view_revenue:true };
     await pool.query(`INSERT INTO manager_profiles (user_id, permissions, notes) VALUES ($1,$2,$3)`, [user.rows[0].id, JSON.stringify(defaultPermissions), notes||'']);
-    res.status(201).json({ message: 'Manager created', id: user.rows[0].id });
+    const { sendWelcomeEmail } = require("../services/emailService");
+    await sendWelcomeEmail(email, first_name, "manager").catch(console.error);
+    res.status(201).json({ message: "Manager created", id: user.rows[0].id });
   } catch (err) {
     console.error('Create manager error:', err);
     res.status(500).json({ error: 'Failed to create manager' });
