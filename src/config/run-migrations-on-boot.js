@@ -89,6 +89,10 @@ async function runBootMigrations() {
 
     console.log('[BOOT_MIGRATION] Manager system tables ready');
 
+    // Allow manager role in users table
+    await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
+    await pool.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'tutor', 'admin', 'manager'))`);
+
   } catch (err) {
     console.error('[BOOT_MIGRATION] Failed:', err.message);
   }
