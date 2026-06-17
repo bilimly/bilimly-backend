@@ -3,70 +3,82 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+
 const app = express();
-app.set('trust proxy', 1);
+
+// ── SECURITY ───────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: '*', credentials: true }));
-app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }));
+app.use(cors({
+  origin: [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+    'https://bilimpark.kg',
+    'https://www.bilimpark.kg'
+  ],
+  credentials: true,
+}));
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please try again later' }
+});
+app.use('/api/', limiter);
+
+// ── BODY PARSING ───────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/auth/google', require('./src/routes/googleAuth'));
-app.use('/api/auth', require('./src/routes/auth'));
-app.use('/api/tutors', require('./src/routes/tutors'));
-app.use('/api/bookings', require('./src/routes/bookings'));
-app.use('/api/payments', require('./src/routes/payments'));
-app.use('/api/packages', require('./src/routes/packages'));
-app.use('/api/earnings', require('./src/routes/earnings'));
-app.use('/api/messages', require('./src/routes/messages'));
-app.use('/api/leads', require('./src/routes/leads'));
-app.use('/api/children', require('./src/routes/children'));
-const passport = require('passport');
-app.use(passport.initialize());
-app.use('/api/telegram', require('./src/routes/telegram'));
-app.use('/api/subjects', require('./src/routes/subjects'));
-app.use('/api/support', require('./src/routes/support'));
-app.use('/api/admin', require('./src/routes/admin'));
-app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
-app.use((err, req, res, next) => {
-  try {
-    const { notifyAdminError } = require('./src/services/telegramService');
-    notifyAdminError(req.originalUrl || 'unknown', err).catch(() => {});
-  } catch (e) { /* swallow */ }
-  console.error('[SERVER ERROR]', req.originalUrl, err);
-  res.status(500).json({ error: 'Server error' });
+
+// ── ROUTES ─────────────────────────────────────────────────
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/tutors', require('./routes/tutors'));
+app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/packages', require('./routes/packages'));
+app.use('/api/earnings', require('./routes/earnings'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/leads', require('./routes/leads'));
+app.use('/api/support', require('./routes/support'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/manager', require('./routes/manager'));
+
+// ── HEALTH CHECK ───────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    name: 'Bilimpark API',
+    version: '1.0.0',
+    time: new Date().toISOString()
+  });
 });
-const PORT = process.env.PORT || process.env.PORT || 3001;
 
-// Start daily admin summary cron
-try {
-  const { startDailySummaryCron } = require('./src/services/adminDailySummary');
-  startDailySummaryCron();
-} catch (e) {
-  console.error('[CRON] Failed to start daily summary:', e);
-}
+// ── 404 ────────────────────────────────────────────────────
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
 
-// Start lesson reminder cron (every 15 min, sends 1-hour-before reminders)
-try {
-  const { startReminderJob } = require('./src/utils/reminderJob');
+// ── ERROR HANDLER ──────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// ── START ──────────────────────────────────────────────────
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`
+  ╔══════════════════════════════════╗
+  ║   🎓 BILIMPARK API RUNNING         ║
+  ║   Port: ${PORT}                     ║
+  ║   Env:  ${process.env.NODE_ENV || 'development'}               ║
+  ╚══════════════════════════════════╝
+  `);
+
+  // Start background jobs
+  const { startReminderJob } = require('./utils/reminderJob');
+  const { scheduleRoomCreation } = require('./services/videoService');
   startReminderJob();
-} catch (e) {
-  console.error('[CRON] Failed to start reminder job:', e);
-}
-
-// Start video room scheduler (every 15 min, auto-creates Jitsi/Daily.co rooms 45-75 min before confirmed lessons)
-try {
-  const { scheduleRoomCreation } = require('./src/services/videoService');
   scheduleRoomCreation();
-} catch (e) {
-  console.error('[CRON] Failed to start video room scheduler:', e);
-}
+});
 
-// Run boot-time schema migrations (idempotent)
-try {
-  const { runBootMigrations } = require('./src/config/run-migrations-on-boot');
-  runBootMigrations();
-} catch (e) {
-  console.error('[BOOT] Migration hook failed:', e);
-}
-
-app.listen(PORT, '0.0.0.0', () => console.log('BILIMPARK RUNNING on port ' + PORT));
+module.exports = app;
