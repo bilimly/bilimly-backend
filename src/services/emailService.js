@@ -129,7 +129,15 @@ const sendWelcomeEmail = async (email, name, role) => {
           <div style="padding:24px;background:#f9fafb;">
             <h2 style="color:#111827">Добро пожаловать, ${name}! 🎉</h2>
             <p>Спасибо за регистрацию на Bilimpark.kg — репетиторской платформе №1 в Кыргызстане.</p>
-            ${role === 'tutor' ? `
+            ${role === 'manager' ? `
+            <p>Вы назначены менеджером платформы Bilimpark.kg. Войдите в кабинет менеджера по ссылке ниже:</p>
+            <div style="background:white;border-radius:10px;padding:16px;margin:16px 0;border:1px solid #e5e7eb;">
+              <p style="margin:0 0 8px 0;font-size:0.85rem;color:#6b7280;">Ваши данные для входа:</p>
+              <p style="margin:0 0 4px 0;"><strong>Email:</strong> ${email}</p>
+              <p style="margin:0;"><strong>Сайт:</strong> bilimpark.kg/manager.html</p>
+            </div>
+            <a href="https://bilimpark.kg/manager.html" style="background:#0ABAB5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:8px;">Открыть кабинет менеджера →</a>
+            ` : role === 'tutor' ? `
             <p>Ваш профиль репетитора создан. Заполните его чтобы студенты могли вас найти:</p>
             <a href="https://bilimpark.kg/tutor-dashboard.html" style="background:#1a5c3a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px;">Заполнить профиль</a>
             ` : `
