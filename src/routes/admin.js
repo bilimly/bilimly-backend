@@ -765,3 +765,82 @@ router.put('/tutors/:userId/toggle-visibility', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── MANAGER MANAGEMENT ─────────────────────────────────────
+router.get('/managers', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at,
+              mp.permissions, mp.notes,
+              (SELECT COUNT(*) FROM manager_tasks WHERE assigned_to = u.id AND status != 'done') as open_tasks,
+              (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) as assigned_leads,
+              (SELECT COUNT(*) FROM manager_activity_log WHERE manager_id = u.id) as total_actions
+       FROM users u
+       LEFT JOIN manager_profiles mp ON u.id = mp.user_id
+       WHERE u.role = 'manager'
+       ORDER BY u.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch managers' });
+  }
+});
+
+router.post('/managers', async (req, res) => {
+  const { email, first_name, last_name, phone, password, permissions, notes } = req.body;
+  if (!email || !first_name || !password) return res.status(400).json({ error: 'Email, first_name and password required' });
+  try {
+    const existing = await pool.query('SELECT id FROM users WHERE email=$1', [email]);
+    if (existing.rows.length > 0) return res.status(400).json({ error: 'Email already registered' });
+    const hash = await bcrypt.hash(password, 12);
+    const user = await pool.query(
+      `INSERT INTO users (email, password_hash, role, first_name, last_name, phone) VALUES ($1,$2,'manager',$3,$4,$5) RETURNING id`,
+      [email, hash, first_name, last_name, phone]
+    );
+    const defaultPermissions = permissions || { view_dashboard:true, view_leads:true, edit_leads:true, view_all_leads:true, view_tutors:true, approve_tutors:true, edit_tutors:true, view_students:true, view_bookings:true, view_revenue:true };
+    await pool.query(`INSERT INTO manager_profiles (user_id, permissions, notes) VALUES ($1,$2,$3)`, [user.rows[0].id, JSON.stringify(defaultPermissions), notes||'']);
+    res.status(201).json({ message: 'Manager created', id: user.rows[0].id });
+  } catch (err) {
+    console.error('Create manager error:', err);
+    res.status(500).json({ error: 'Failed to create manager' });
+  }
+});
+
+router.put('/managers/:id/permissions', async (req, res) => {
+  const { permissions, notes } = req.body;
+  try {
+    await pool.query(`UPDATE manager_profiles SET permissions=$1, notes=$2 WHERE user_id=$3`, [JSON.stringify(permissions), notes, req.params.id]);
+    res.json({ message: 'Permissions updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update permissions' });
+  }
+});
+
+router.put('/managers/:id/toggle', async (req, res) => {
+  try {
+    const result = await pool.query(`UPDATE users SET is_active = NOT is_active WHERE id=$1 AND role='manager' RETURNING is_active`, [req.params.id]);
+    res.json({ is_active: result.rows[0].is_active });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle manager' });
+  }
+});
+
+router.delete('/managers/:id', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM manager_profiles WHERE user_id=$1`, [req.params.id]);
+    await pool.query(`DELETE FROM users WHERE id=$1 AND role='manager'`, [req.params.id]);
+    res.json({ message: 'Manager deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete manager' });
+  }
+});
+
+router.put('/leads/:id/assign', async (req, res) => {
+  const { manager_id } = req.body;
+  try {
+    await pool.query(`UPDATE leads SET assigned_to=$1, updated_at=NOW() WHERE id=$2`, [manager_id, req.params.id]);
+    res.json({ message: 'Lead assigned' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to assign lead' });
+  }
+});
