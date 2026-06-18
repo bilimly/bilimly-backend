@@ -184,9 +184,9 @@ router.get('/my-summary', auth, requireRole('tutor'), async (req, res) => {
     if (!tutor.rows[0]) return res.status(404).json({ error: 'Tutor profile not found' });
     const tp = tutor.rows[0];
 
-    const { tierForHours, COMMISSION_TIERS } = require('../services/commissionService');
+    const { tierForLessons, COMMISSION_TIERS } = require('../services/commissionService');
     const isFounding = tp.is_founding === true;
-    const baseTier = tierForHours(tp.total_paid_hours || 0);
+    const baseTier = tierForLessons(tp.total_paid_hours || 0);
 
     // Ledger aggregates
     const ledger = await pool.query(
