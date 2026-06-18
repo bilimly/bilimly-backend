@@ -766,7 +766,9 @@ router.put('/tutors/:userId/toggle-visibility', async (req, res) => {
 
 module.exports = router;
 
-// ── MANAGER MANAGEMENT ─────────────────────────────────────
+// ── MANAGER MANAGEMENT (admin only) ───────────────────────
+
+// Get all managers
 router.get('/managers', async (req, res) => {
   try {
     const result = await pool.query(
@@ -786,47 +788,76 @@ router.get('/managers', async (req, res) => {
   }
 });
 
+// Create manager account
 router.post('/managers', async (req, res) => {
   const { email, first_name, last_name, phone, password, permissions, notes } = req.body;
-  if (!email || !first_name || !password) return res.status(400).json({ error: 'Email, first_name and password required' });
+  if (!email || !first_name || !password) {
+    return res.status(400).json({ error: 'Email, first_name and password required' });
+  }
   try {
     const existing = await pool.query('SELECT id FROM users WHERE email=$1', [email]);
     if (existing.rows.length > 0) return res.status(400).json({ error: 'Email already registered' });
+
     const hash = await bcrypt.hash(password, 12);
     const user = await pool.query(
-      `INSERT INTO users (email, password_hash, role, first_name, last_name, phone) VALUES ($1,$2,'manager',$3,$4,$5) RETURNING id`,
+      `INSERT INTO users (email, password_hash, role, first_name, last_name, phone)
+       VALUES ($1,$2,'manager',$3,$4,$5) RETURNING id`,
       [email, hash, first_name, last_name, phone]
     );
-    const defaultPermissions = permissions || { view_dashboard:true, view_leads:true, edit_leads:true, view_all_leads:true, view_tutors:true, approve_tutors:true, edit_tutors:true, view_students:true, view_bookings:true, view_revenue:true };
-    await pool.query(`INSERT INTO manager_profiles (user_id, permissions, notes) VALUES ($1,$2,$3)`, [user.rows[0].id, JSON.stringify(defaultPermissions), notes||'']);
-    const { sendWelcomeEmail } = require("../services/emailService");
-    await sendWelcomeEmail(email, first_name, "manager").catch(console.error);
-    res.status(201).json({ message: "Manager created", id: user.rows[0].id });
+
+    const defaultPermissions = permissions || {
+      view_dashboard: true,
+      view_leads: true,
+      edit_leads: true,
+      view_all_leads: true,
+      view_tutors: true,
+      approve_tutors: true,
+      edit_tutors: true,
+      view_students: true,
+      view_bookings: true,
+      view_revenue: true,
+    };
+
+    await pool.query(
+      `INSERT INTO manager_profiles (user_id, permissions, notes) VALUES ($1,$2,$3)`,
+      [user.rows[0].id, JSON.stringify(defaultPermissions), notes || '']
+    );
+
+    res.status(201).json({ message: 'Manager created', id: user.rows[0].id });
   } catch (err) {
     console.error('Create manager error:', err);
     res.status(500).json({ error: 'Failed to create manager' });
   }
 });
 
+// Update manager permissions
 router.put('/managers/:id/permissions', async (req, res) => {
   const { permissions, notes } = req.body;
   try {
-    await pool.query(`UPDATE manager_profiles SET permissions=$1, notes=$2 WHERE user_id=$3`, [JSON.stringify(permissions), notes, req.params.id]);
+    await pool.query(
+      `UPDATE manager_profiles SET permissions=$1, notes=$2 WHERE user_id=$3`,
+      [JSON.stringify(permissions), notes, req.params.id]
+    );
     res.json({ message: 'Permissions updated' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update permissions' });
   }
 });
 
+// Toggle manager active status
 router.put('/managers/:id/toggle', async (req, res) => {
   try {
-    const result = await pool.query(`UPDATE users SET is_active = NOT is_active WHERE id=$1 AND role='manager' RETURNING is_active`, [req.params.id]);
+    const result = await pool.query(
+      `UPDATE users SET is_active = NOT is_active WHERE id=$1 AND role='manager' RETURNING is_active`,
+      [req.params.id]
+    );
     res.json({ is_active: result.rows[0].is_active });
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle manager' });
   }
 });
 
+// Delete manager
 router.delete('/managers/:id', async (req, res) => {
   try {
     await pool.query(`DELETE FROM manager_profiles WHERE user_id=$1`, [req.params.id]);
@@ -837,12 +868,207 @@ router.delete('/managers/:id', async (req, res) => {
   }
 });
 
+// Assign lead to manager
 router.put('/leads/:id/assign', async (req, res) => {
   const { manager_id } = req.body;
   try {
-    await pool.query(`UPDATE leads SET assigned_to=$1, updated_at=NOW() WHERE id=$2`, [manager_id, req.params.id]);
+    await pool.query(
+      `UPDATE leads SET assigned_to=$1, updated_at=NOW() WHERE id=$2`,
+      [manager_id, req.params.id]
+    );
     res.json({ message: 'Lead assigned' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to assign lead' });
+  }
+});
+
+// Get activity log
+router.get('/activity-log', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT l.*, u.first_name, u.last_name
+       FROM manager_activity_log l
+       JOIN users u ON l.manager_id = u.id
+       ORDER BY l.created_at DESC
+       LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch activity log' });
+  }
+});
+
+// ── ANALYTICS ──────────────────────────────────────────────
+router.get('/analytics', async (req, res) => {
+  const { period = '30' } = req.query; // days
+  try {
+    const [
+      dailyBookings,
+      subjectStats,
+      topTutors,
+      studentGrowth,
+      tutorGrowth,
+      conversionStats,
+      revenueByDay,
+      lessonTypes,
+      hourlyDistribution,
+    ] = await Promise.all([
+
+      // Daily bookings for last N days
+      pool.query(`
+        SELECT 
+          DATE(created_at) as date,
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed,
+          COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
+          COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+          COALESCE(SUM(amount) FILTER (WHERE status IN ('completed','confirmed')), 0) as revenue
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `),
+
+      // Most popular subjects
+      pool.query(`
+        SELECT 
+          subject,
+          COUNT(*) as total_bookings,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed,
+          COALESCE(SUM(amount) FILTER (WHERE status IN ('completed','confirmed')), 0) as revenue,
+          COUNT(DISTINCT student_id) as unique_students
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+          AND subject IS NOT NULL
+        GROUP BY subject
+        ORDER BY total_bookings DESC
+        LIMIT 10
+      `),
+
+      // Top performing tutors
+      pool.query(`
+        SELECT 
+          u.first_name, u.last_name, u.id,
+          tp.id as profile_id,
+          tp.subjects, tp.rating, tp.hourly_rate,
+          COUNT(b.id) as total_bookings,
+          COUNT(b.id) FILTER (WHERE b.status = 'completed') as completed_lessons,
+          COALESCE(SUM(b.amount) FILTER (WHERE b.status IN ('completed','confirmed')), 0) as gross_revenue,
+          COUNT(DISTINCT b.student_id) as unique_students
+        FROM tutor_profiles tp
+        JOIN users u ON tp.user_id = u.id
+        LEFT JOIN bookings b ON b.tutor_id = tp.id 
+          AND b.created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        WHERE tp.is_approved = true
+        GROUP BY u.first_name, u.last_name, u.id, tp.id, tp.subjects, tp.rating, tp.hourly_rate
+        ORDER BY completed_lessons DESC, gross_revenue DESC
+        LIMIT 10
+      `),
+
+      // Student growth (new registrations per day)
+      pool.query(`
+        SELECT 
+          DATE(created_at) as date,
+          COUNT(*) as new_students
+        FROM users
+        WHERE role = 'student'
+          AND created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `),
+
+      // Tutor growth
+      pool.query(`
+        SELECT 
+          DATE(created_at) as date,
+          COUNT(*) as new_tutors
+        FROM users
+        WHERE role = 'tutor'
+          AND created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `),
+
+      // Overall conversion stats
+      pool.query(`
+        SELECT
+          COUNT(*) as total_bookings,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed,
+          COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
+          COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+          COUNT(*) FILTER (WHERE status = 'pending') as pending,
+          COUNT(*) FILTER (WHERE lesson_type = 'trial') as trial_lessons,
+          COUNT(DISTINCT student_id) as unique_students,
+          COUNT(DISTINCT tutor_id) as active_tutors,
+          COALESCE(SUM(amount) FILTER (WHERE status IN ('completed','confirmed')), 0) as total_revenue,
+          COALESCE(AVG(amount), 0) as avg_lesson_price
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+      `),
+
+      // Revenue by day
+      pool.query(`
+        SELECT 
+          DATE(created_at) as date,
+          COALESCE(SUM(amount) FILTER (WHERE status IN ('completed','confirmed')), 0) as revenue,
+          COALESCE(SUM(amount * 0.4) FILTER (WHERE status IN ('completed','confirmed')), 0) as commission
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `),
+
+      // Trial vs regular lessons
+      pool.query(`
+        SELECT 
+          lesson_type,
+          COUNT(*) as count,
+          COALESCE(SUM(amount), 0) as revenue
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY lesson_type
+      `),
+
+      // Bookings by hour of day
+      pool.query(`
+        SELECT 
+          EXTRACT(HOUR FROM created_at) as hour,
+          COUNT(*) as bookings
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '${parseInt(period)} days'
+        GROUP BY EXTRACT(HOUR FROM created_at)
+        ORDER BY hour ASC
+      `),
+    ]);
+
+    // Total platform stats
+    const totals = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM users WHERE role = 'student') as total_students,
+        (SELECT COUNT(*) FROM users WHERE role = 'tutor') as total_tutors,
+        (SELECT COUNT(*) FROM tutor_profiles WHERE is_approved = true) as approved_tutors,
+        (SELECT COUNT(*) FROM bookings) as total_bookings,
+        (SELECT COUNT(*) FROM bookings WHERE status = 'completed') as completed_lessons,
+        (SELECT COALESCE(SUM(amount), 0) FROM bookings WHERE status IN ('completed','confirmed')) as total_revenue,
+        (SELECT COUNT(*) FROM leads) as total_leads,
+        (SELECT COUNT(*) FROM leads WHERE status = 'converted') as converted_leads
+    `);
+
+    res.json({
+      period: parseInt(period),
+      totals: totals.rows[0],
+      conversion: conversionStats.rows[0],
+      daily_bookings: dailyBookings.rows,
+      revenue_by_day: revenueByDay.rows,
+      subjects: subjectStats.rows,
+      top_tutors: topTutors.rows,
+      student_growth: studentGrowth.rows,
+      tutor_growth: tutorGrowth.rows,
+      lesson_types: lessonTypes.rows,
+      hourly_distribution: hourlyDistribution.rows,
+    });
+  } catch (err) {
+    console.error('Analytics error:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
