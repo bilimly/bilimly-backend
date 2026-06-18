@@ -223,14 +223,65 @@ router.put('/:id/cancel', auth, async (req, res) => {
 
 // ── CONFIRM BOOKING (tutor) ────────────────────────────────
 router.put('/:id/confirm', auth, requireRole('tutor'), async (req, res) => {
-  const { meeting_url } = req.body;
   try {
+    // Get booking details
+    const bookingResult = await pool.query(
+      `SELECT b.*, 
+              u_student.email as student_email, u_student.first_name as student_first_name, u_student.last_name as student_last_name,
+              u_tutor.email as tutor_email, u_tutor.first_name as tutor_first_name, u_tutor.last_name as tutor_last_name
+       FROM bookings b
+       JOIN users u_student ON b.student_id = u_student.id
+       JOIN tutor_profiles tp ON b.tutor_id = tp.id
+       JOIN users u_tutor ON tp.user_id = u_tutor.id
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+
+    if (!bookingResult.rows[0]) return res.status(404).json({ error: 'Booking not found' });
+    const booking = bookingResult.rows[0];
+
+    // Auto-create Google Meet link
+    let meetUrl = req.body.meeting_url || null;
+    try {
+      const { createMeetingLink } = require('../services/googleMeetService');
+      meetUrl = await createMeetingLink(
+        booking,
+        `${booking.tutor_first_name} ${booking.tutor_last_name}`,
+        booking.tutor_email,
+        `${booking.student_first_name} ${booking.student_last_name}`,
+        booking.student_email,
+        booking.subject || 'Урок'
+      );
+    } catch (meetErr) {
+      console.error('[CONFIRM] Meet link creation failed:', meetErr.message);
+      // Don't fail the confirmation if Meet link fails
+    }
+
     await pool.query(
       'UPDATE bookings SET status=$1, meeting_url=$2, updated_at=NOW() WHERE id=$3',
-      ['confirmed', meeting_url, req.params.id]
+      ['confirmed', meetUrl, req.params.id]
     );
-    res.json({ message: 'Booking confirmed' });
+
+    // Send confirmation email to student with Meet link
+    try {
+      const { sendBookingConfirmation } = require('../services/emailService');
+      await sendBookingConfirmation(
+        booking.student_email,
+        booking.student_first_name,
+        booking.tutor_first_name + ' ' + booking.tutor_last_name,
+        booking.subject,
+        new Date(booking.lesson_date).toLocaleDateString('ru-RU'),
+        booking.start_time,
+        booking.amount,
+        meetUrl
+      );
+    } catch (emailErr) {
+      console.error('[CONFIRM] Email failed:', emailErr.message);
+    }
+
+    res.json({ message: 'Booking confirmed', meeting_url: meetUrl });
   } catch (err) {
+    console.error('[CONFIRM] Error:', err);
     res.status(500).json({ error: 'Failed to confirm booking' });
   }
 });
