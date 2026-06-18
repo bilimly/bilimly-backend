@@ -46,19 +46,19 @@ const sendBookingConfirmation = async (studentEmail, studentName, tutorName, sub
 };
 
 // ── LESSON REMINDER ────────────────────────────────────────
-const sendLessonReminder = async (email, name, tutorName, subject, time, meetingUrl) => {
+const sendLessonReminder = async (email, name, tutorName, subject, time, meetingUrl, hoursAhead = 1) => {
   try {
     await resend.emails.send({
       from: `Bilimpark.kg <${FROM}>`,
       to: email,
-      subject: `⏰ Напоминание: урок через 1 час — ${subject}`,
+      subject: `${hoursAhead === 24 ? '📅 Напоминание: урок завтра' : '⏰ Урок через 1 час'} — ${subject}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#1a5c3a;padding:24px;text-align:center;">
             <h1 style="color:white;font-size:1.5rem;margin:0">Bilimpark.kg</h1>
           </div>
           <div style="padding:24px;background:#f9fafb;">
-            <h2 style="color:#111827">Урок начинается через 1 час! ⏰</h2>
+            <h2 style="color:#111827">${hoursAhead === 24 ? 'Урок завтра! 📅' : 'Урок начинается через 1 час! ⏰'}</h2>
             <p>Здравствуйте, <strong>${name}</strong>!</p>
             <div style="background:white;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #e5e7eb;">
               <p><strong>📚 Предмет:</strong> ${subject}</p>
