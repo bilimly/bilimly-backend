@@ -2,6 +2,14 @@ const https = require('https');
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.ADMIN_TELEGRAM_CHAT_ID;
+const MANAGER_CHAT_ID = process.env.MANAGER_TELEGRAM_CHAT_ID;
+
+const notifyAdmins = async (message) => {
+  const ids = [ADMIN_CHAT_ID, MANAGER_CHAT_ID].filter(Boolean);
+  for (const id of ids) {
+    await sendMessage(id, message).catch(console.error);
+  }
+};
 
 const sendMessage = async (chatId, message) => {
   return new Promise((resolve, reject) => {
@@ -78,7 +86,7 @@ const URGENCY_LABEL = {
 };
 
 const notifyAdminNewLead = async (lead, matchedTutors = []) => {
-  if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
+  if (!ADMIN_CHAT_ID && !MANAGER_CHAT_ID) return { ok: false, skipped: "no_admin_chat_id" };
   const grade = GRADE_LABEL[lead.grade_band] || lead.grade_band;
   const urgency = URGENCY_LABEL[lead.urgency] || lead.urgency;
   const tutorsLine = matchedTutors.length
@@ -92,11 +100,11 @@ const notifyAdminNewLead = async (lead, matchedTutors = []) => {
     `${urgency}\n\n` +
     `<b>Подобраны:</b>\n${tutorsLine}\n\n` +
     `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
-  return sendMessage(ADMIN_CHAT_ID, msg);
+  return notifyAdmins( msg);
 };
 
 const notifyAdminNewBooking = async ({ subject, amount, lessonDate, startTime, studentName, tutorName }) => {
-  if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
+  if (!ADMIN_CHAT_ID && !MANAGER_CHAT_ID) return { ok: false, skipped: "no_admin_chat_id" };
   const msg =
     `💰 <b>Новое бронирование</b>\n\n` +
     `👤 Студент: ${escapeHtml(studentName || 'Неизвестно')}\n` +
@@ -104,11 +112,11 @@ const notifyAdminNewBooking = async ({ subject, amount, lessonDate, startTime, s
     `📚 Предмет: ${escapeHtml(subject || '—')}\n` +
     `📆 ${escapeHtml(lessonDate)} в ${escapeHtml(startTime)}\n` +
     `💵 ${amount} сом`;
-  return sendMessage(ADMIN_CHAT_ID, msg);
+  return notifyAdmins( msg);
 };
 
 const notifyAdminNewTutorApplication = async (app) => {
-  if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
+  if (!ADMIN_CHAT_ID && !MANAGER_CHAT_ID) return { ok: false, skipped: "no_admin_chat_id" };
   const subjectsStr = Array.isArray(app.subjects) ? app.subjects.join(', ') : (app.subjects || '—');
   const msg =
     `👨‍🏫 <b>Новая заявка репетитора</b>\n\n` +
@@ -119,7 +127,7 @@ const notifyAdminNewTutorApplication = async (app) => {
     `Опыт: ${app.experience_years || 0} лет\n` +
     `Ставка: ${app.hourly_rate || '—'} сом/ч\n\n` +
     `<a href="https://bilimpark.kg/admin.html">Проверить →</a>`;
-  return sendMessage(ADMIN_CHAT_ID, msg);
+  return notifyAdmins( msg);
 };
 
 // Error notification with in-memory dedup: same error signature -> 1 ping per 15 min.
@@ -127,7 +135,7 @@ const recentErrorPings = new Map();
 const ERROR_DEDUP_MS = 15 * 60 * 1000;
 
 const notifyAdminError = async (route, error) => {
-  if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
+  if (!ADMIN_CHAT_ID && !MANAGER_CHAT_ID) return { ok: false, skipped: "no_admin_chat_id" };
   const errMsg = (error && error.message) ? String(error.message) : String(error);
   const signature = `${route}::${errMsg}`.slice(0, 200);
   const now = Date.now();
@@ -146,11 +154,11 @@ const notifyAdminError = async (route, error) => {
     `Роут: <code>${escapeHtml(route)}</code>\n` +
     `Ошибка: <code>${escapeHtml(errMsg.slice(0, 300))}</code>\n\n` +
     (stack ? `<pre>${escapeHtml(stack)}</pre>` : '');
-  return sendMessage(ADMIN_CHAT_ID, msg);
+  return notifyAdmins( msg);
 };
 
 const sendAdminDailySummary = async (stats) => {
-  if (!ADMIN_CHAT_ID) return { ok: false, skipped: 'no_admin_chat_id' };
+  if (!ADMIN_CHAT_ID && !MANAGER_CHAT_ID) return { ok: false, skipped: "no_admin_chat_id" };
   const msg =
     `📊 <b>Bilimpark — итоги дня</b>\n` +
     `${stats.date}\n\n` +
@@ -165,7 +173,7 @@ const sendAdminDailySummary = async (stats) => {
     `  ⏳ Не связались с лидами: ${stats.uncontacted_leads}\n` +
     `  📝 Ждут проверки (репетиторы): ${stats.pending_tutor_apps}\n\n` +
     `<a href="https://bilimpark.kg/admin.html">Открыть админку →</a>`;
-  return sendMessage(ADMIN_CHAT_ID, msg);
+  return notifyAdmins( msg);
 };
 
 module.exports = {
