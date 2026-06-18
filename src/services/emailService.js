@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.FROM_EMAIL || 'admin@bilimpark.kg';
 
 // ── BOOKING CONFIRMATION ───────────────────────────────────
-const sendBookingConfirmation = async (studentEmail, studentName, tutorName, subject, date, time, amount) => {
+const sendBookingConfirmation = async (studentEmail, studentName, tutorName, subject, date, time, amount, meetUrl = null) => {
   try {
     await resend.emails.send({
       from: `Bilimpark.kg <${FROM}>`,
@@ -26,7 +26,11 @@ const sendBookingConfirmation = async (studentEmail, studentName, tutorName, sub
               <p><strong>🕐 Время:</strong> ${time}</p>
               <p><strong>💰 Сумма:</strong> ${amount} сом</p>
             </div>
-            <p>Ссылка на урок придёт за 30 минут до начала.</p>
+            ${meetUrl ? `<div style="background:white;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #e5e7eb;text-align:center;">
+              <p style="font-weight:600;margin-bottom:12px;">🎥 Ссылка на урок готова!</p>
+              <a href="${meetUrl}" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:bold;font-size:1rem;">Войти в Google Meet →</a>
+              <p style="font-size:0.8rem;color:#6b7280;margin-top:8px;">Или скопируйте ссылку: ${meetUrl}</p>
+            </div>` : '<p style="color:#6b7280">Ссылка на урок придёт после подтверждения репетитором.</p>'}
             <a href="https://bilimpark.kg" style="background:#1a5c3a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px;">Открыть Bilimpark</a>
           </div>
           <div style="padding:16px;text-align:center;color:#6b7280;font-size:0.8rem;">
@@ -61,7 +65,12 @@ const sendLessonReminder = async (email, name, tutorName, subject, time, meeting
               <p><strong>👨‍🏫 Репетитор:</strong> ${tutorName}</p>
               <p><strong>🕐 Время:</strong> ${time}</p>
             </div>
-            ${meetingUrl ? `<a href="${meetingUrl}" style="background:#e8533a;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;display:inline-block;font-size:1rem;font-weight:bold;">🎥 Войти в урок</a>` : ''}
+            ${meetingUrl ? `
+            <div style="background:white;border-radius:12px;padding:20px;margin:20px 0;border:2px solid #0ABAB5;text-align:center;">
+              <p style="font-weight:600;margin-bottom:12px;color:#0a0a0a;">Урок начинается через 1 час!</p>
+              <a href="${meetingUrl}" style="background:#0ABAB5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-block;font-size:1rem;font-weight:bold;">🎥 Войти в Google Meet →</a>
+              <p style="font-size:0.8rem;color:#6b7280;margin-top:8px;">${meetingUrl}</p>
+            </div>` : '<p style="color:#6b7280;text-align:center">Ссылка на урок не найдена. Свяжитесь с репетитором.</p>'}
           </div>
           <div style="padding:16px;text-align:center;color:#6b7280;font-size:0.8rem;">
             © 2026 Bilimpark.kg · Бишкек, Кыргызстан
@@ -129,15 +138,7 @@ const sendWelcomeEmail = async (email, name, role) => {
           <div style="padding:24px;background:#f9fafb;">
             <h2 style="color:#111827">Добро пожаловать, ${name}! 🎉</h2>
             <p>Спасибо за регистрацию на Bilimpark.kg — репетиторской платформе №1 в Кыргызстане.</p>
-            ${role === 'manager' ? `
-            <p>Вы назначены менеджером платформы Bilimpark.kg. Войдите в кабинет менеджера по ссылке ниже:</p>
-            <div style="background:white;border-radius:10px;padding:16px;margin:16px 0;border:1px solid #e5e7eb;">
-              <p style="margin:0 0 8px 0;font-size:0.85rem;color:#6b7280;">Ваши данные для входа:</p>
-              <p style="margin:0 0 4px 0;"><strong>Email:</strong> ${email}</p>
-              <p style="margin:0;"><strong>Сайт:</strong> bilimpark.kg/manager.html</p>
-            </div>
-            <a href="https://bilimpark.kg/manager.html" style="background:#0ABAB5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:8px;">Открыть кабинет менеджера →</a>
-            ` : role === 'tutor' ? `
+            ${role === 'tutor' ? `
             <p>Ваш профиль репетитора создан. Заполните его чтобы студенты могли вас найти:</p>
             <a href="https://bilimpark.kg/tutor-dashboard.html" style="background:#1a5c3a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px;">Заполнить профиль</a>
             ` : `
