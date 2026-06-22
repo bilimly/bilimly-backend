@@ -112,3 +112,17 @@ async function addTutorProfileFields() {
 }
 
 addTutorProfileFields();
+
+// Freedom Pay payment columns
+async function addFreedomPayColumns() {
+  const sqls = [
+    `ALTER TABLE payments ADD COLUMN IF NOT EXISTS fp_payment_id VARCHAR(100)`,
+    `ALTER TABLE payments ADD COLUMN IF NOT EXISTS fp_redirect_url TEXT`,
+    `ALTER TABLE payments ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ`,
+  ];
+  for (const sql of sqls) {
+    await pool.query(sql).catch(e => console.error('[MIGRATION FP]', e.message));
+  }
+  console.log('[BOOT_MIGRATION] Freedom Pay columns ready');
+}
+addFreedomPayColumns();
