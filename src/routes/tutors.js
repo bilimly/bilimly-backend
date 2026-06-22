@@ -47,15 +47,15 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.first_name, u.last_name, u.avatar_url,
-              tp.*
+      `SELECT u.id as user_id, u.first_name, u.last_name, u.avatar_url,
+              tp.id as tutor_profile_id, tp.*
        FROM users u
        JOIN tutor_profiles tp ON u.id = tp.user_id
        WHERE (u.id = $1 OR tp.id = $1)`,
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
-    const tutorProfileId = result.rows[0].tutor_id || result.rows[0].id;
+    const tutorProfileId = result.rows[0].tutor_profile_id || result.rows[0].tutor_id;
     const [reviews, availability] = await Promise.all([
       pool.query(
         `SELECT r.*, u.first_name, u.last_name 
