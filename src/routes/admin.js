@@ -1072,3 +1072,37 @@ router.get('/analytics', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
+
+// ── ADMIN EDIT TUTOR PROFILE ───────────────────────────────
+router.put('/tutors/:userId/profile', async (req, res) => {
+  const { subjects, headline, hourly_rate, trial_rate, city, highlights, bio_ru, video_intro_url } = req.body;
+  try {
+    await pool.query(
+      `UPDATE tutor_profiles SET 
+        subjects=$1, headline=$2, hourly_rate=$3, trial_rate=$4,
+        city=$5, highlights=$6, bio_ru=$7, video_intro_url=$8,
+        updated_at=NOW()
+       WHERE user_id=$9`,
+      [subjects||[], headline||null, hourly_rate||500, trial_rate||0,
+       city||'Бишкек', JSON.stringify(highlights||[]), bio_ru||null, video_intro_url||null, req.params.userId]
+    );
+    res.json({ message: 'Tutor profile updated' });
+  } catch(err) {
+    console.error('Edit tutor profile error:', err);
+    res.status(500).json({ error: 'Failed to update tutor profile' });
+  }
+});
+
+// ── ADMIN EDIT USER INFO ───────────────────────────────────
+router.put('/users/:userId', async (req, res) => {
+  const { first_name, last_name, phone } = req.body;
+  try {
+    await pool.query(
+      `UPDATE users SET first_name=$1, last_name=$2, phone=$3, updated_at=NOW() WHERE id=$4`,
+      [first_name, last_name, phone, req.params.userId]
+    );
+    res.json({ message: 'User updated' });
+  } catch(err) {
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
