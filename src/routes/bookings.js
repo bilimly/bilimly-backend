@@ -6,7 +6,23 @@ const router = express.Router();
 
 // ── CREATE BOOKING ─────────────────────────────────────────
 router.post('/', auth, requireRole('student'), async (req, res) => {
-  const { tutor_id, lesson_date, start_time, end_time, lesson_type, subject, student_notes } = req.body;
+  const { tutor_id, lesson_date, start_time, end_time: rawEndTime, lesson_type, subject, student_notes, duration_minutes } = req.body;
+
+  // Calculate end_time from duration_minutes if not provided
+  let end_time = rawEndTime;
+  if (!end_time && start_time && duration_minutes) {
+    const [h, m] = start_time.split(':').map(Number);
+    const totalMins = h * 60 + m + parseInt(duration_minutes || 60);
+    end_time = `${String(Math.floor(totalMins / 60) % 24).padStart(2,'0')}:${String(totalMins % 60).padStart(2,'0')}:00`;
+  }
+  if (!end_time) {
+    // Default: 1 hour after start
+    if (start_time) {
+      const [h, m] = start_time.split(':').map(Number);
+      const totalMins = h * 60 + m + 60;
+      end_time = `${String(Math.floor(totalMins / 60) % 24).padStart(2,'0')}:${String(totalMins % 60).padStart(2,'0')}:00`;
+    }
+  }
 
   try {
     // Get tutor profile and rate
@@ -17,7 +33,9 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
     if (!tutorResult.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
 
     const tutorRow = tutorResult.rows[0];
-    const amount = lesson_type === 'trial' ? tutorRow.trial_rate : tutorRow.hourly_rate;
+    const amount = lesson_type === 'trial'
+      ? (tutorRow.trial_rate || tutorRow.hourly_rate || 500)
+      : (tutorRow.hourly_rate || 500);
 
     // Check for conflicts
     const conflict = await pool.query(
@@ -42,21 +60,38 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
        lesson_type || 'trial', subject, student_notes, amount]
     );
 
-    // Create pending payment
+    // Create pending payment record
     const payment = await pool.query(
       `INSERT INTO payments (booking_id, student_id, amount, payment_method, status)
-       VALUES ($1,$2,$3,'mbank_qr','pending') RETURNING id`,
+       VALUES ($1,$2,$3,'freedompay','pending') RETURNING id`,
       [booking.rows[0].id, req.user.id, amount]
     );
 
-    // Generate Mbank QR (currently demo placeholder — Batch 5 replaces with real fixed QR)
-    const { generateMbankQR } = require('../services/mbankService');
-    const qrData = await generateMbankQR(payment.rows[0].id, amount);
+    // Create Freedom Pay payment page
+    let fpRedirectUrl = null;
+    let fpPaymentId = null;
+    try {
+      const { createPayment } = require('../services/freedomPayService');
+      const fp = await createPayment({
+        orderId:      payment.rows[0].id,
+        amount,
+        description:  `Урок по предмету "${subject || 'Урок'}" на Bilimpark.kg`,
+        successUrl:   `${process.env.FRONTEND_URL}/payment-success.html?booking_id=${booking.rows[0].id}`,
+        failUrl:      `${process.env.FRONTEND_URL}/payment-fail.html?booking_id=${booking.rows[0].id}`,
+        resultUrl:    `${process.env.BACKEND_URL || 'https://bilimly-backend-0zbt.onrender.com'}/api/payments/freedompay/webhook`,
+        customerEmail: req.user.email,
+      });
+      fpRedirectUrl = fp.redirect_url;
+      fpPaymentId   = fp.payment_id;
 
-    await pool.query(
-      'UPDATE payments SET mbank_qr_code=$1, mbank_qr_url=$2 WHERE id=$3',
-      [qrData.qr_code, qrData.qr_url, payment.rows[0].id]
-    );
+      await pool.query(
+        `UPDATE payments SET fp_payment_id=$1, fp_redirect_url=$2 WHERE id=$3`,
+        [fpPaymentId, fpRedirectUrl, payment.rows[0].id]
+      );
+    } catch (fpErr) {
+      console.error('[BOOKINGS] Freedom Pay init failed:', fpErr.message);
+      // Don't fail booking creation - student can retry payment from dashboard
+    }
 
     // Fetch student + tutor user records once for all notifications
     const [studentRow, tutorUserRow] = await Promise.all([
@@ -125,13 +160,10 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
     res.status(201).json({
       booking: booking.rows[0],
       payment: {
-        id: payment.rows[0].id,
+        id:           payment.rows[0].id,
         amount,
-        qr_code: qrData.qr_code,
-        qr_url: qrData.qr_url,
-        instructions_ru: 'Отсканируйте QR-код через приложение MBANK для оплаты урока',
-        instructions_ky: 'Сабак үчүн төлөм жасоо үчүн MBANK колдонмосу аркылуу QR-кодду сканерлеңиз',
-        instructions_en: 'Scan the QR code via the MBANK app to pay for your lesson'
+        redirect_url: fpRedirectUrl,
+        fp_payment_id: fpPaymentId,
       }
     });
   } catch (err) {
