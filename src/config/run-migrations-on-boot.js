@@ -126,3 +126,16 @@ async function addFreedomPayColumns() {
   console.log('[BOOT_MIGRATION] Freedom Pay columns ready');
 }
 addFreedomPayColumns();
+
+// Fix payment_method constraint to allow freedompay
+async function fixPaymentMethodConstraint() {
+  try {
+    await pool.query(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check`);
+    await pool.query(`ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check 
+      CHECK (payment_method IN ('mbank_qr','freedompay','card','cash','transfer','other'))`);
+    console.log('[BOOT_MIGRATION] payment_method constraint updated');
+  } catch(e) {
+    console.error('[MIGRATION] payment_method constraint:', e.message);
+  }
+}
+fixPaymentMethodConstraint();
