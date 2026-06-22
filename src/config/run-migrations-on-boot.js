@@ -89,13 +89,26 @@ async function runBootMigrations() {
 
     console.log('[BOOT_MIGRATION] Manager system tables ready');
 
-    // Allow manager role in users table
-    await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
-    await pool.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'tutor', 'admin', 'manager'))`);
-
   } catch (err) {
     console.error('[BOOT_MIGRATION] Failed:', err.message);
   }
 }
 
 module.exports = { runBootMigrations };
+
+// New tutor profile fields
+async function addTutorProfileFields() {
+  const fields = [
+    `ALTER TABLE tutor_profiles ADD COLUMN IF NOT EXISTS headline VARCHAR(200)`,
+    `ALTER TABLE tutor_profiles ADD COLUMN IF NOT EXISTS highlights JSONB DEFAULT '[]'`,
+    `ALTER TABLE tutor_profiles ADD COLUMN IF NOT EXISTS languages JSONB DEFAULT '[]'`,
+    `ALTER TABLE tutor_profiles ADD COLUMN IF NOT EXISTS education JSONB DEFAULT '[]'`,
+    `ALTER TABLE tutor_profiles ADD COLUMN IF NOT EXISTS city VARCHAR(100)`,
+  ];
+  for (const sql of fields) {
+    await pool.query(sql).catch(e => console.error('[MIGRATION]', e.message));
+  }
+  console.log('[BOOT_MIGRATION] Tutor profile fields ready');
+}
+
+addTutorProfileFields();
