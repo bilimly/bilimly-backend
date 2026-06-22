@@ -24,13 +24,17 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
     }
   }
 
+  console.log('[BOOKING] tutor_id received:', tutor_id, 'type:', typeof tutor_id);
   try {
     // Get tutor profile and rate
     const tutorResult = await pool.query(
-      'SELECT id, hourly_rate, trial_rate, user_id FROM tutor_profiles WHERE id = $1 AND is_approved = true',
+      'SELECT id, hourly_rate, trial_rate, user_id FROM tutor_profiles WHERE id = $1 OR user_id = $1',
       [tutor_id]
     );
-    if (!tutorResult.rows[0]) return res.status(404).json({ error: 'Tutor not found' });
+    if (!tutorResult.rows[0]) {
+      console.log('[BOOKING] Tutor not found for id:', tutor_id);
+      return res.status(404).json({ error: 'Tutor not found', tutor_id });
+    }
 
     const tutorRow = tutorResult.rows[0];
     const amount = lesson_type === 'trial'
