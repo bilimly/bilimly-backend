@@ -328,7 +328,8 @@ router.post('/submit-review', auth, requireRole('tutor'), async (req, res) => {
     // Fetch full profile for the notification payload
     const profile = await pool.query(
       `SELECT u.first_name, u.last_name, u.email, u.phone,
-              tp.subjects, tp.hourly_rate, tp.bio_ru, tp.city
+              tp.subjects, tp.hourly_rate, tp.bio_ru, tp.city,
+              tp.headline, tp.highlights, tp.languages, tp.education, tp.video_intro_url
          FROM users u
          JOIN tutor_profiles tp ON tp.user_id = u.id
         WHERE u.id = $1`,
