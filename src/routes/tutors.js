@@ -80,15 +80,34 @@ router.get('/:id', async (req, res) => {
 });
 
 router.put('/profile/me', auth, requireRole('tutor'), async (req, res) => {
-  const { bio_ru, bio_ky, bio_en, hourly_rate, trial_rate, subjects, city, video_intro_url } = req.body;
+  const body = req.body;
   try {
+    // Build dynamic SET clause - only update fields that are explicitly sent
+    const allowedFields = [
+      'bio_ru','bio_ky','bio_en','hourly_rate','trial_rate','subjects',
+      'city','video_intro_url','headline','highlights','languages','education'
+    ];
+    const updates = [];
+    const values = [];
+    let idx = 1;
+    for (const field of allowedFields) {
+      if (field in body) {
+        updates.push(`${field}=$${idx}`);
+        // JSON fields
+        if (['subjects','highlights','languages','education'].includes(field)) {
+          values.push(JSON.stringify(body[field] || []));
+        } else {
+          values.push(body[field] ?? null);
+        }
+        idx++;
+      }
+    }
+    if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
+    updates.push(`updated_at=NOW()`);
+    values.push(req.user.id);
     const result = await pool.query(
-      `UPDATE tutor_profiles SET bio_ru=$1, bio_ky=$2, bio_en=$3,
-       hourly_rate=$4, trial_rate=$5, subjects=$6, city=$7,
-       video_intro_url=$8, updated_at=NOW()
-       WHERE user_id=$9 RETURNING *`,
-      [bio_ru, bio_ky, bio_en, hourly_rate||500, trial_rate||200,
-       subjects||[], city||'Бишкек', video_intro_url, req.user.id]
+      `UPDATE tutor_profiles SET ${updates.join(',')} WHERE user_id=$${idx} RETURNING *`,
+      values
     );
     res.json(result.rows[0]);
   } catch (err) {
