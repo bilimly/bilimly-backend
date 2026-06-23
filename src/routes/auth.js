@@ -69,7 +69,10 @@ router.get('/me', auth, async (req, res) => {
     const result = await pool.query(
       `SELECT u.id, u.email, u.role, u.first_name, u.last_name,
               u.phone, u.avatar_url, u.language_preference, u.created_at,
-              tp.id as tutor_profile_id, tp.is_approved, tp.hourly_rate, tp.rating
+              tp.id as tutor_profile_id, tp.is_approved, tp.hourly_rate, tp.trial_rate,
+              tp.rating, tp.bio_ru, tp.subjects, tp.city, tp.video_intro_url,
+              tp.headline, tp.highlights, tp.languages, tp.education,
+              tp.approval_status, tp.total_lessons, tp.review_count
        FROM users u
        LEFT JOIN tutor_profiles tp ON u.id = tp.user_id
        WHERE u.id = $1`,
