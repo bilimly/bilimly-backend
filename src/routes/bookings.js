@@ -202,8 +202,12 @@ router.get('/my', auth, async (req, res) => {
               u_tutor.first_name as tutor_first_name,
               u_tutor.last_name as tutor_last_name,
               u_tutor.avatar_url as tutor_avatar,
+              tp.id as tutor_profile_id,
+              tp.rating as tutor_rating,
+              p.id as payment_id,
               p.status as payment_status,
-              p.mbank_qr_url
+              p.amount as payment_amount,
+              p.fp_redirect_url
        FROM bookings b
        JOIN users u_student ON b.student_id = u_student.id
        JOIN tutor_profiles tp ON b.tutor_id = tp.id
