@@ -163,4 +163,29 @@ router.post('/:id/retry', auth, async (req, res) => {
   }
 });
 
+// ── GET /api/payments/history — student's payment history ──────
+router.get('/history', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.amount, p.currency, p.status, p.payment_method,
+              p.created_at, p.paid_at,
+              b.lesson_date, b.subject,
+              u_tutor.first_name as tutor_first_name,
+              u_tutor.last_name as tutor_last_name
+       FROM payments p
+       JOIN bookings b ON p.booking_id = b.id
+       LEFT JOIN tutor_profiles tp ON b.tutor_id = tp.id
+       LEFT JOIN users u_tutor ON tp.user_id = u_tutor.id
+       WHERE b.student_id = $1
+       ORDER BY p.created_at DESC
+       LIMIT 100`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[PAYMENT HISTORY]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
