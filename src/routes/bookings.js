@@ -37,8 +37,11 @@ router.post('/', auth, requireRole('student'), async (req, res) => {
     }
 
     const tutorRow = tutorResult.rows[0];
+    // Trial lessons are a FIXED platform price (500 som) for every tutor.
+    // The tutor cannot set or change this — 100% goes to the platform.
+    const TRIAL_PRICE = 500;
     const amount = lesson_type === 'trial'
-      ? (tutorRow.trial_rate || tutorRow.hourly_rate || 500)
+      ? TRIAL_PRICE
       : (tutorRow.hourly_rate || 500);
 
     // Check for conflicts
@@ -373,15 +376,19 @@ router.post('/:id/complete', auth, async (req, res) => {
         [booking.rows[0].tutor_id]
       );
     }
-    // Record commission earnings for this lesson
+    // Record commission earnings for this lesson — EXCLUDING trials.
+    // Trials are paid by the student but the money goes 100% to the platform;
+    // the tutor is not credited for trial lessons.
     try {
       const { recordLessonEarnings } = require('../services/commissionService');
       const fullBooking = await pool.query(
-        `SELECT id, tutor_id, amount, duration_minutes FROM bookings WHERE id = $1`,
+        `SELECT id, tutor_id, amount, duration_minutes, lesson_type FROM bookings WHERE id = $1`,
         [req.params.id]
       );
-      if (fullBooking.rows[0]) {
+      if (fullBooking.rows[0] && fullBooking.rows[0].lesson_type !== 'trial') {
         await recordLessonEarnings(pool, fullBooking.rows[0]);
+      } else {
+        console.log('[BOOKINGS] Trial lesson — no tutor earnings recorded (100% to platform)');
       }
     } catch (earnErr) {
       console.error('[BOOKINGS] Failed to record earnings:', earnErr);
