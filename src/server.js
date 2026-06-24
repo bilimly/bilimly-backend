@@ -37,9 +37,13 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/packages', require('./routes/packages'));
 app.use('/api/earnings', require('./routes/earnings'));
 app.use('/api/messages', require('./routes/messages'));
-app.use('/api/leads', require('./src/routes/leads'));
+app.use('/api/leads', require('./routes/leads'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/manager', require('./routes/manager'));
+app.use('/api/children', require('./routes/children'));
+app.use('/api/subjects', require('./routes/subjects'));
+app.use('/api/telegram', require('./routes/telegram'));
 
 // ── HEALTH CHECK ───────────────────────────────────────────
 app.get('/health', (req, res) => {
