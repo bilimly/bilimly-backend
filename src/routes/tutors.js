@@ -84,7 +84,7 @@ router.put('/profile/me', auth, requireRole('tutor'), async (req, res) => {
   try {
     // Build dynamic SET clause - only update fields that are explicitly sent
     const allowedFields = [
-      'bio_ru','bio_ky','bio_en','hourly_rate','trial_rate','subjects',
+      'bio_ru','bio_ky','bio_en','hourly_rate','subjects',
       'city','video_intro_url','headline','highlights','languages','education'
     ];
     const updates = [];
