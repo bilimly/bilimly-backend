@@ -85,13 +85,24 @@ router.get('/me', auth, async (req, res) => {
 });
 
 router.put('/me', auth, async (req, res) => {
-  const { first_name, last_name, phone, language_preference } = req.body;
+  const allowed = ['first_name', 'last_name', 'phone', 'language_preference', 'avatar_url'];
+  const fields = [];
+  const values = [];
+  let idx = 1;
+  for (const key of allowed) {
+    if (key in req.body) {
+      fields.push(`${key}=$${idx++}`);
+      values.push(req.body[key] === '' ? null : req.body[key]);
+    }
+  }
+  if (!fields.length) return res.status(400).json({ error: 'No fields to update' });
+  fields.push('updated_at=NOW()');
+  values.push(req.user.id);
   try {
     const result = await pool.query(
-      `UPDATE users SET first_name=$1, last_name=$2, phone=$3,
-       language_preference=$4, updated_at=NOW()
-       WHERE id=$5 RETURNING id, email, role, first_name, last_name, phone, language_preference`,
-      [first_name, last_name, phone, language_preference, req.user.id]
+      `UPDATE users SET ${fields.join(', ')}
+       WHERE id=$${idx} RETURNING id, email, role, first_name, last_name, phone, language_preference`,
+      values
     );
     res.json(result.rows[0]);
   } catch (err) {
