@@ -30,6 +30,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── ROUTES ─────────────────────────────────────────────────
+app.use(require('passport').initialize());
+app.use('/api/auth/google', require('./routes/googleAuth'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tutors', require('./routes/tutors'));
 app.use('/api/bookings', require('./routes/bookings'));
