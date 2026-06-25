@@ -19,11 +19,16 @@ router.post('/register', [
   try {
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) return res.status(400).json({ error: 'Email already registered' });
+
+    // Normalize phone to +E164 so storage is consistent regardless of input format
+    const { toE164 } = require('../utils/phone');
+    const normalizedPhone = phone ? (toE164(phone) || phone) : null;
+
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, role, first_name, last_name, phone, language_preference)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, role, first_name, last_name`,
-      [email, password_hash, role, first_name, last_name, phone || null, language_preference || 'ru']
+      [email, password_hash, role, first_name, last_name, normalizedPhone, language_preference || 'ru']
     );
     const user = result.rows[0];
     if (role === 'tutor') {
@@ -32,10 +37,18 @@ router.post('/register', [
         'INSERT INTO tutor_profiles (user_id, commission_locked_18pct) VALUES ($1, $2)',
         [user.id, isFoundingPeriod]
       );
+      // Fire-and-forget instant WhatsApp welcome from the business number.
+      if (normalizedPhone) {
+        try {
+          const { sendTutorWelcome } = require('../services/whatsappService');
+          sendTutorWelcome(normalizedPhone, first_name).catch(e =>
+            console.error('[REGISTER] Tutor welcome failed:', e.message));
+        } catch (e) { /* swallow */ }
+      }
     }
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const { sendWelcomeEmail } = require('../services/emailService');
-sendWelcomeEmail(email, first_name, role).catch(console.error);
+    sendWelcomeEmail(email, first_name, role).catch(console.error);
     res.status(201).json({ token, user });
   } catch (err) {
     console.error('Register error:', err);
@@ -91,8 +104,14 @@ router.put('/me', auth, async (req, res) => {
   let idx = 1;
   for (const key of allowed) {
     if (key in req.body) {
+      let val = req.body[key] === '' ? null : req.body[key];
+      // Normalize phone to +E164 regardless of input format
+      if (key === 'phone' && val) {
+        const { toE164 } = require('../utils/phone');
+        val = toE164(val) || val;
+      }
       fields.push(`${key}=$${idx++}`);
-      values.push(req.body[key] === '' ? null : req.body[key]);
+      values.push(val);
     }
   }
   if (!fields.length) return res.status(400).json({ error: 'No fields to update' });
