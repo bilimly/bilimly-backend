@@ -99,7 +99,7 @@ router.get('/callback', (req, res, next) => {
         first_name: user.first_name, last_name: user.last_name,
         role: user.role, avatar_url: user.avatar_url
       }));
-      let path = '/student-dashboard.html';
+      let path = '/dashboard.html';
       if (user.role === 'tutor') path = '/tutor-dashboard.html';
       else if (user.role === 'admin') path = '/admin.html';
       else if (user.role === 'manager') path = '/manager.html';
