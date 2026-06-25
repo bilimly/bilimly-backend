@@ -20,12 +20,8 @@ const submitLimiter = rateLimit({
 // Accepts: "+996555123456", "996555123456", "0555123456", "555123456",
 // "+996 555 12-34-56", etc.
 function normalizeKgPhone(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('996')) return '+' + digits;
-  if (digits.length === 10 && digits.startsWith('0')) return '+996' + digits.slice(1);
-  if (digits.length === 9) return '+996' + digits;
-  return null;
+  const { toE164 } = require('../utils/phone');
+  return toE164(raw);
 }
 
 // Find 3 best-matching tutors for a given subject.
@@ -148,6 +144,16 @@ router.post(
           { phone, grade_band, subject, urgency },
           matchedTutors
         ).catch((e) => console.error('[LEADS] Admin notify failed:', e));
+      } catch (e) { /* swallow */ }
+
+      // Fire-and-forget INSTANT WhatsApp auto-response to the student.
+      // This is the "5-minute response" lever — we reply in seconds.
+      try {
+        const { sendLeadAutoResponse } = require('../services/whatsappService');
+        sendLeadAutoResponse(
+          { phone, subject, grade_band, urgency },
+          matchedTutors
+        ).catch((e) => console.error('[LEADS] Auto-response failed:', e));
       } catch (e) { /* swallow */ }
 
       return res.status(201).json({
