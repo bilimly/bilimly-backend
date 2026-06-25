@@ -120,7 +120,7 @@ const handleIncomingMessage = async (from, message, whatsappMessageId) => {
     }));
 
     // Get AI response
-    const { handleChatMessage } = require('./supportAgent');
+    const { handleChatMessage } = require('../agents/supportAgent');
     const reply = await handleChatMessage(message, user?.id, 'whatsapp', history);
 
     // Send reply
@@ -139,4 +139,85 @@ const handleIncomingMessage = async (from, message, whatsappMessageId) => {
   }
 };
 
-module.exports = { sendMessage, sendBookingConfirmation, sendLessonReminder, handleIncomingMessage };
+// ── INSTANT LEAD AUTO-RESPONSE (sent the moment a lead is captured) ──
+// Goal: respond to every new student lead within seconds, not 5 minutes.
+const SUBJECT_LABELS = {
+  primary: 'начальные классы',
+  middle: 'средние классы',
+  high: 'старшие классы',
+  ort_university: 'подготовка к ОРТ / поступление',
+};
+
+const sendLeadAutoResponse = async (lead, matchedTutors = []) => {
+  try {
+    if (!lead?.phone) return;
+
+    // Build a warm, human first-touch message. If we matched tutors, mention them.
+    let tutorLine = '';
+    if (matchedTutors.length) {
+      const names = matchedTutors.slice(0, 3).map(t => {
+        const fn = t.first_name || t.name || 'репетитор';
+        const price = t.hourly_rate ? ` — ${t.hourly_rate} сом/час` : '';
+        return `• ${fn}${price}`;
+      }).join('\n');
+      tutorLine = `\n\nВот несколько репетиторов по предмету «${lead.subject}», которые вам подойдут:\n${names}\n`;
+    }
+
+    const message =
+`Здравствуйте! 👋 Это Билим — помощник Bilimpark.kg.
+
+Спасибо за заявку на репетитора по предмету «${lead.subject}»! Мы уже подбираем для вас лучшего преподавателя.${tutorLine}
+📚 Пробный урок стоит всего 500 сом — это знакомство с репетитором, чтобы понять, подходит ли он вам.
+
+🛡 Гарантия: если урок не понравится — дадим 2 бесплатных пробных урока с другими репетиторами или вернём деньги.
+
+Напишите мне прямо здесь, какой предмет и для какого класса нужен — я помогу записаться за пару минут! 😊`;
+
+    await sendMessage(lead.phone, message);
+
+    // Log the outbound auto-response so the AI has context if the student replies
+    await pool.query(
+      `INSERT INTO support_messages (user_id, channel, direction, message, is_ai_response)
+       VALUES (NULL,'whatsapp','outbound',$1,true)`,
+      [message]
+    ).catch(() => {});
+
+    console.log(`[LEAD AUTO-RESPONSE] Sent to ${lead.phone}`);
+  } catch (err) {
+    console.error('[LEAD AUTO-RESPONSE] Failed:', err.message);
+  }
+};
+
+// ── INSTANT TUTOR WELCOME (sent the moment a tutor signs up) ──
+// Triggered from tutor registration. Greets the applicant from the
+// business WhatsApp so they feel a human picked up immediately.
+const sendTutorWelcome = async (rawPhone, firstName = '') => {
+  try {
+    const { toWhatsApp } = require('../utils/phone');
+    const waDigits = toWhatsApp(rawPhone);
+    if (!waDigits) {
+      console.warn('[TUTOR WELCOME] Could not normalize phone:', rawPhone);
+      return;
+    }
+
+    const name = firstName ? ` ${firstName}` : '';
+    const message =
+`Саламатсызбы${name}! 👋 Это команда Bilimpark.kg.
+
+Спасибо, что подали заявку стать репетитором! 🎓 Мы уже получили вашу анкету.
+
+Что дальше:
+1️⃣ Наш менеджер проверит профиль (обычно в течение дня)
+2️⃣ Мы поможем настроить профиль и добавить расписание
+3️⃣ Вы начнёте получать учеников 🚀
+
+Если есть вопросы — просто ответьте на это сообщение, мы на связи! 😊`;
+
+    await sendMessage(waDigits, message);
+    console.log(`[TUTOR WELCOME] Sent to ${waDigits}`);
+  } catch (err) {
+    console.error('[TUTOR WELCOME] Failed:', err.message);
+  }
+};
+
+module.exports = { sendMessage, sendBookingConfirmation, sendLessonReminder, handleIncomingMessage, sendLeadAutoResponse, sendTutorWelcome };
